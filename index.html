@@ -5,18 +5,25 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>BloxyMart</title>
   <style>
-    /* simplified styles for clarity */
-    body{font-family:Arial,Helvetica,sans-serif;background:#071029;color:#e6eef8;margin:0}
-    .wrap{max-width:980px;margin:24px auto;padding:18px}
-    .card{background:#071a2b;border-radius:12px;padding:14px}
-    .top{display:flex;gap:8px}
-    input{flex:1;padding:10px;border-radius:8px;border:1px solid #123}
-    button,a{padding:10px 12px;border-radius:8px;border:0;cursor:pointer}
-    .btn-primary{background:#5eead4;color:#042825}
-    .btn-success{background:#34d399;color:#044231}
-    .panel{display:flex;gap:12px;align-items:flex-start}
-    img{width:160px;height:160px;border-radius:8px;object-fit:cover}
-    pre{background:#021224;padding:10px;border-radius:8px;color:#cfe3ff;overflow:auto}
+    :root{--bg:#071029;--card:#08202f;--muted:#9fb1d1;--accent:#5eead4}
+    body{font-family:Inter,Arial,Helvetica,sans-serif;background:var(--bg);color:#e6eef8;margin:0}
+    .wrap{max-width:1100px;margin:24px auto;padding:18px}
+    .card{background:var(--card);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,0.03)}
+    .top{display:flex;gap:8px;align-items:center}
+    input{flex:1;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    button,a{padding:10px 12px;border-radius:10px;border:0;cursor:pointer}
+    .btn-primary{background:var(--accent);color:#042825;font-weight:700}
+    .btn-secondary{background:#60a5fa;color:#05264a;font-weight:700}
+    .grid{display:grid;grid-template-columns:300px 1fr;gap:18px;margin-top:16px}
+    .left{display:flex;flex-direction:column;gap:12px;align-items:center}
+    img{width:260px;height:260px;border-radius:10px;object-fit:cover;border:1px solid rgba(255,255,255,0.03)}
+    .meta{width:100%;background:rgba(255,255,255,0.02);padding:10px;border-radius:8px}
+    .download-row{display:flex;gap:8px;width:100%}
+    .download-row a{flex:1;text-align:center;text-decoration:none}
+    .panel{background:rgba(255,255,255,0.02);padding:12px;border-radius:10px}
+    .assets{max-height:240px;overflow:auto;padding:6px;border-radius:6px;background:rgba(0,0,0,0.1)}
+    pre{background:#021224;padding:10px;border-radius:8px;color:#cfe3ff;overflow:auto;max-height:360px}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}img{width:180px;height:180px}}
   </style>
 </head>
 <body>
@@ -24,24 +31,32 @@
     <div class="card">
       <div class="top">
         <input id="username" placeholder="Username de Roblox" />
-        <button id="btnSearch" class="btn-primary">Buscar</button>
-        <button id="btnClear">Limpiar</button>
+        <button id="btnSearch" class="btn-primary">🔍 Buscar</button>
+        <button id="btnClear" class="btn-secondary">🧹 Limpiar</button>
       </div>
-      <hr />
-      <div class="panel">
-        <div>
-          <img id="avatarPreview" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'><rect width='160' height='160' fill='%23010f1a'/><text x='50%' y='50%' fill='%239fb1d1' font-size='12' text-anchor='middle' dominant-baseline='middle'>Sin preview</text></svg>" alt="preview">
-          <div style="margin-top:8px">
-            <a id="downloadR15" class="btn-success" href="#">⬇️ R15 OBJ</a>
-            <a id="downloadR6" class="btn-success" href="#">⬇️ R6 OBJ</a>
+
+      <div class="grid">
+        <div class="left">
+          <img id="avatarPreview" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 260'><rect width='260' height='260' fill='%23010f1a'/><text x='50%' y='50%' fill='%239fb1d1' font-size='14' text-anchor='middle' dominant-baseline='middle'>Sin preview</text></svg>" alt="preview">
+          <div class="meta" id="meta">Usuario: —<br>Display: —<br>ID: —</div>
+          <div class="download-row">
+            <a id="downloadR15" class="btn-primary" href="#">⬇️ Descargar R15 OBJ</a>
+            <a id="downloadR6" class="btn-secondary" href="#">⬇️ Descargar R6 OBJ</a>
           </div>
         </div>
-        <div style="flex:1">
-          <div id="meta">Usuario: — / Display: — / ID: —</div>
-          <h4>Artículos</h4>
-          <div id="wearing">—</div>
-          <h4>Respuesta cruda</h4>
-          <pre id="raw">—</pre>
+
+        <div>
+          <div class="panel">
+            <h3 style="margin:0 0 8px 0">Artículos (Ropa y Accesorios)</h3>
+            <div class="assets" id="wearing">Sin datos</div>
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="panel">
+            <h3 style="margin:0 0 8px 0">Datos completos</h3>
+            <pre id="raw">—</pre>
+          </div>
         </div>
       </div>
     </div>
@@ -51,60 +66,62 @@ const usernameEl = document.getElementById('username');
 const btnSearch = document.getElementById('btnSearch');
 const btnClear = document.getElementById('btnClear');
 const avatarPreview = document.getElementById('avatarPreview');
-const meta = document.getElementById('meta');
-const rawEl = document.getElementById('raw');
+const metaEl = document.getElementById('meta');
 const wearingEl = document.getElementById('wearing');
+const rawEl = document.getElementById('raw');
 const downloadR15 = document.getElementById('downloadR15');
 const downloadR6 = document.getElementById('downloadR6');
 
 let currentUserId = null;
 
-function setStatus(msg, isError){
-  meta.textContent = msg;
-  if(isError) meta.style.color = '#f88'; else meta.style.color = '#cfe3ff';
+function setMeta(user, profile){
+  metaEl.innerHTML = `Usuario: <strong>${profile.name}</strong><br>Display: ${profile.displayName || '—'}<br>ID: ${user.id}`;
 }
 
+function setStatusText(msg){ rawEl.textContent = msg }
+
 async function safeJson(res){
-  const ct = res.headers.get('content-type') || '';
+  const ct = (res.headers.get('content-type')||'').toLowerCase();
   if(ct.includes('application/json')) return res.json();
-  // try json, fallback to text
-  try{ return await res.json(); }catch(e){ const text = await res.text(); return { error: text }; }
+  try{ return await res.json(); }catch(e){ const t = await res.text(); return { error: t } }
 }
 
 async function search(){
-  const username = usernameEl.value.trim(); if(!username){ setStatus('Escribe un username', true); return }
-  btnSearch.disabled = true; setStatus('Buscando...');
+  const username = usernameEl.value.trim(); if(!username){ setStatusText('Escribe un username'); return }
+  btnSearch.disabled = true; setStatusText('Buscando...');
   try{
     const res = await fetch('/api/search', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ username }) });
     const data = await safeJson(res);
-    if(!res.ok) throw new Error(data.error || data || 'Error buscando');
+    if(!res.ok) throw new Error(data.error || 'Error buscando');
     const { user, profile, avatarUrl, assets } = data;
     currentUserId = user.id;
-    avatarPreview.src = avatarUrl || avatarPreview.src;
-    meta.innerHTML = `Usuario: ${profile.name} / Display: ${profile.displayName || '—'} / ID: ${user.id}`;
-    wearingEl.innerHTML = assets && assets.length ? assets.map(a=> `<div>${a.name} (${a.assetType}) #${a.id}</div>`).join('') : 'Sin artículos';
+    if(avatarUrl) avatarPreview.src = avatarUrl;
+    setMeta(user, profile);
+    wearingEl.innerHTML = assets && assets.length ? assets.map(a=>`<div><strong>${a.name||'Unknown'}</strong> <small>(${a.assetType})</small><br><small>ID: ${a.id}</small></div>`).join('') : 'Sin artículos';
     rawEl.textContent = JSON.stringify(data, null, 2);
     downloadR15.onclick = ()=> downloadModel(user.id,'r15');
     downloadR6.onclick = ()=> downloadModel(user.id,'r6');
-  }catch(err){ setStatus('Error: '+err.message, true); }
+  }catch(err){ setStatusText('Error: '+err.message); }
   finally{ btnSearch.disabled = false }
 }
 
 async function downloadModel(userId, type){
-  if(!userId){ setStatus('No user selected', true); return }
+  if(!userId){ setStatusText('No user selected'); return }
+  setStatusText('Preparando descarga...');
   try{
-    setStatus('Descargando ZIP...');
     const res = await fetch('/api/download', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ userId, type }) });
+    const ct = (res.headers.get('content-type')||'').toLowerCase();
     if(!res.ok){ const data = await safeJson(res); throw new Error(data.error || 'Descarga fallida'); }
+    if(ct.includes('application/json')){ const data = await res.json(); throw new Error(data.error || 'Respuesta JSON inesperada'); }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `avatar_${userId}_${type}.zip`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    setStatus('Descarga completada');
-  }catch(err){ setStatus('Error: '+err.message, true); }
+    setStatusText('Descarga completada.');
+  }catch(err){ setStatusText('Error: '+err.message); }
 }
 
 btnSearch.addEventListener('click', search);
-btnClear.addEventListener('click', ()=>{ usernameEl.value=''; avatarPreview.src='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><rect width="160" height="160" fill="%23010f1a"/><text x="50%" y="50%" fill="%239fb1d1" font-size="12" text-anchor="middle" dominant-baseline="middle">Sin preview</text></svg>'; meta.textContent='Usuario: — / Display: — / ID: —'; wearingEl.innerHTML='—'; rawEl.textContent='—'; currentUserId=null })
+btnClear.addEventListener('click', ()=>{ usernameEl.value=''; avatarPreview.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 260 260%22><rect width=%22260%22 height=%22260%22 fill=%22%23010f1a%22/><text x=%2250%25%22 y=%2250%25%22 fill=%22%239fb1d1%22 font-size=%2214%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22>Sin preview</text></svg>'; metaEl.innerHTML='Usuario: —<br>Display: —<br>ID: —'; wearingEl.innerHTML='Sin datos'; rawEl.textContent='—'; currentUserId=null })
 
 </script>
 </body>

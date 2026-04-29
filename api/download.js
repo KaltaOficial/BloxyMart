@@ -1,31 +1,48 @@
 import JSZip from 'jszip';
 
+function extFromContentType(ct) {
+  if (!ct) return 'bin';
+  ct = ct.split(';')[0].trim().toLowerCase();
+  if (ct === 'image/png') return 'png';
+  if (ct === 'image/jpeg' || ct === 'image/jpg') return 'jpg';
+  if (ct === 'image/webp') return 'webp';
+  if (ct === 'application/zip') return 'zip';
+  if (ct === 'application/octet-stream') return 'bin';
+  if (ct === 'text/plain') return 'txt';
+  if (ct === 'model/gltf+json' || ct === 'application/gltf+json') return 'gltf';
+  if (ct === 'model/fbx' || ct === 'application/octet-stream') return 'fbx';
+  // fallback
+  return 'bin';
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { userId, type } = req.body;
-
   if (!userId || !type) {
     return res.status(400).json({ error: 'User ID and type required' });
   }
 
   try {
-    // Fetch avatar details
+    // Get avatar data
     const avatarRes = await fetch(`https://avatar.roblox.com/v1/users/${userId}/avatar`);
-    if (!avatarRes.ok) throw new Error('Failed to fetch avatar details from Roblox');
+    if (!avatarRes.ok) throw new Error(`Failed to fetch avatar details (${avatarRes.status})`);
     const avatarData = await avatarRes.json();
 
     const zip = new JSZip();
-    let objLines = [];
+    const texturesFolder = zip.folder('textures');
+    const assetsFolder = zip.folder('assets');
 
-    objLines.push('# BloxyMart - Roblox Avatar OBJ Model');
+    // Start building OBJ
+    const objLines = [];
+    objLines.push(`# BloxyMart - Roblox Avatar OBJ Model`);
     objLines.push(`# User ID: ${userId}`);
     objLines.push(`# Type: ${type}`);
     objLines.push('');
 
-    // Simple placeholder body mesh (users can edit/replace in Blender)
+    // Add placeholder body vertices (keeps model usable)
     if (type === 'r15') {
       objLines.push('o body_r15');
       objLines.push('v -0.5 0 0.5');
@@ -60,45 +77,90 @@ export default async function handler(req, res) {
       objLines.push('f 5 1 4 8');
     }
 
-    // Add basic thumbnail texture
+    // Fetch thumbnail and add as texture
     try {
-      const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=420x420&format=Png&isCircular=false`);
+      const thumbRes = await fetch(
+        `https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=420x420&format=Png&isCircular=false`
+      );
       if (thumbRes.ok) {
         const arr = await thumbRes.arrayBuffer();
         const buffer = Buffer.from(arr);
-        zip.file('textures/avatar_thumbnail.png', buffer);
-        // reference the texture in the OBJ Material (simple MTL file)
-        const mtl = `newmtl mat0\nKa 1.000 1.000 1.000\nKd 1.000 1.000 1.000\nKs 0.000 0.000 0.000\nmap_Kd textures/avatar_thumbnail.png\n`;
-        zip.file('avatar.mtl', mtl);
-        objLines.unshift(`mtllib avatar.mtl`);
+        texturesFolder.file(`avatar_thumbnail.png`, buffer);
+        objLines.unshift('mtllib avatar.mtl');
         objLines.push('usemtl mat0');
       }
     } catch (e) {
-      // ignore thumbnail errors
-      console.error('Thumbnail fetch failed', e.message);
+      console.error('Thumbnail error:', e.message);
     }
 
-    // Attempt to include simple meshes for wearable assets
-    if (avatarData.assets && Array.isArray(avatarData.assets)) {
-      for (const asset of avatarData.assets) {
-        // Skip non-mesh types
-        const skipTypes = ['Animation', 'LocalScript', 'Script', 'ModuleScript', 'Emote', 'ParticleEmitter', 'Sound'];
-        if (skipTypes.includes(asset.assetType)) continue;
+    // Process wearable assets - best-effort: attempt to download their assetbinary and textures
+    const assets = Array.isArray(avatarData.assets) ? avatarData.assets : [];
+    const readmeLines = [];
+    readmeLines.push(`BloxyMart Avatar OBJ`);
+    readmeLines.push(`User ID: ${userId}`);
+    readmeLines.push(`Type: ${type}`);
+    readmeLines.push('');
+    readmeLines.push('Included:');
+    readmeLines.push('- avatar.obj');
+    readmeLines.push('- textures/ (thumbnail + any downloaded images)');
+    readmeLines.push('- assets/ (raw asset files when available)');
+    readmeLines.push('');
+    readmeLines.push('Asset list:');
 
-        // Try to fetch an OBJ-like representation from Roblox (best-effort)
-        try {
-          // There's no official OBJ CDN; try asset delivery for mesh files (binary). We won't try to parse mesh formats here.
-          // Instead, include an entry in the README listing the asset IDs so users can fetch them manually if needed.
-          // This prevents server-side parsing errors and keeps the service stable.
-          objLines.push(`# Asset: ${asset.name} (id: ${asset.id}, type: ${asset.assetType})`);
-        } catch (e) {
-          console.error(`Failed to process asset ${asset.id}:`, e.message);
+    for (const asset of assets) {
+      try {
+        // Skip non-relevant asset types
+        const skipTypes = ['Animation', 'LocalScript', 'Script', 'ModuleScript', 'Emote', 'ParticleEmitter', 'Sound'];
+        if (skipTypes.includes(asset.assetType)) {
+          readmeLines.push(`# Skipped asset ${asset.id} (${asset.assetType})`);
+          continue;
         }
+
+        // Try to download via assetdelivery endpoint
+        const adUrl = `https://assetdelivery.roblox.com/v2/assetId/${asset.id}`;
+        const aRes = await fetch(adUrl);
+        if (!aRes.ok) {
+          // sometimes assetdelivery responds with 403 or HTML; log and continue
+          const txt = await aRes.text().catch(() => '');
+          console.error(`Asset ${asset.id} download failed: ${aRes.status}`, txt.slice(0,200));
+          readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - download failed: ${aRes.status}`);
+          continue;
+        }
+
+        // Determine content-type and extension
+        const ct = (aRes.headers.get('content-type') || '').toLowerCase();
+        const ext = extFromContentType(ct);
+
+        // If it's JSON or HTML, skip saving as binary
+        if (ct.includes('application/json') || ct.includes('text/html')) {
+          const txt = await aRes.text().catch(() => '');
+          readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - unexpected content-type: ${ct}`);
+          continue;
+        }
+
+        // Get final fetched data as arrayBuffer
+        const arr = await aRes.arrayBuffer();
+        const buffer = Buffer.from(arr);
+
+        // Save asset binary
+        const filename = `asset_${asset.id}.${ext}`;
+        assetsFolder.file(filename, buffer);
+        readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) -> assets/${filename}`);
+
+        // If it's an image, also add to textures folder
+        if (ct.startsWith('image/')) {
+          texturesFolder.file(`${asset.id}.${ext}`, buffer);
+        }
+
+      } catch (e) {
+        console.error(`Error processing asset ${asset.id}:`, e.message);
+        readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - error: ${e.message}`);
       }
     }
 
+    // Write avatar.obj and README
     zip.file('avatar.obj', objLines.join('\n'));
-    zip.file('README.txt', `BloxyMart Avatar OBJ\nUser ID: ${userId}\nType: ${type}\n\nIncluded:\n- avatar.obj\n- avatar.mtl (if thumbnail available)\n- textures/avatar_thumbnail.png (if available)\n\nNotes:\n- This service creates a basic OBJ with a placeholder body and references to textures.\n- Full mesh extraction from Roblox proprietary formats requires more complex processing and different tooling.\n- Asset list is included as comments in avatar.obj.`);
+    zip.file('README.txt', readmeLines.join('\n'));
 
     const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
 
@@ -107,7 +169,6 @@ export default async function handler(req, res) {
     res.status(200).send(zipBuffer);
   } catch (error) {
     console.error('Download error:', error);
-    // Always return JSON for errors so frontend can parse it safely
-    res.status(500).json({ error: String(error.message || 'Download failed') });
+    return res.status(500).json({ error: String(error.message || 'Download failed') });
   }
 }
