@@ -227,36 +227,43 @@ async function search(){
   setStatus('Buscando...');
 
   try{
-    const searchData = await api('/api/roblox/search', {
-      method:'POST',
-      body: JSON.stringify({ username })
+    // Usar API pública de Roblox
+    const userRes = await fetch(`https://users.roblox.com/v1/usernames/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usernames: [username], excludeBannedUsers: false })
     });
-
-    if(!searchData?.userId){
+    
+    if(!userRes.ok) throw new Error('No encontré ese usuario.');
+    const userData = await userRes.json();
+    
+    if(!userData.data || userData.data.length === 0){
       throw new Error('No encontré ese usuario.');
     }
 
-    const profile = await api(`/api/roblox/profile?userId=${encodeURIComponent(searchData.userId)}`);
-    let wearing = [];
-    try{
-      const wearData = await api(`/api/roblox/wearing?userId=${encodeURIComponent(searchData.userId)}`);
-      wearing = wearData.assetIds || [];
-    }catch(e){}
+    const user = userData.data[0];
+    const userId = user.id;
 
-    const thumb = profile.thumbnailUrl || searchData.thumbnailUrl || '';
+    // Obtener perfil del usuario
+    const profileRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
+    const profile = await profileRes.json();
+
+    // Obtener avatar
+    const avatarRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=420x420&format=Png&isCircular=false`);
+    const avatarData = await avatarRes.json();
+    const thumb = avatarData.data?.[0]?.imageUrl || '';
+
     if(thumb) avatarPreview.src = thumb;
 
     meta.innerHTML = `
-      <div><strong>Usuario:</strong> ${escapeHtml(profile.name || searchData.name || username)}</div>
+      <div><strong>Usuario:</strong> ${escapeHtml(profile.name || username)}</div>
       <div><strong>Display:</strong> ${escapeHtml(profile.displayName || '—')}</div>
-      <div><strong>User ID:</strong> ${escapeHtml(searchData.userId)}</div>
+      <div><strong>User ID:</strong> ${escapeHtml(userId)}</div>
     `;
 
-    wearingEl.innerHTML = wearing.length
-      ? wearing.map(id => `<span class="chip">Asset ${escapeHtml(id)}</span>`).join('')
-      : `<span class="chip">Sin datos</span>`;
+    wearingEl.innerHTML = `<span class="chip">Sin datos</span>`;
 
-    rawEl.textContent = JSON.stringify({ searchData, profile, wearing }, null, 2);
+    rawEl.textContent = JSON.stringify({ user, profile }, null, 2);
     downloadObj.href = makeObj(profile.name || username);
     downloadObj.download = `${(profile.name || username).replace(/[^a-zA-Z0-9_\-]/g, '_')}.obj`;
 
