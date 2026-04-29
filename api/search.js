@@ -45,11 +45,13 @@ export default async function handler(req, res) {
       const avatarDetails = await assetsRes.json();
       
       if (avatarDetails.assets) {
-        assets = avatarDetails.assets.map(asset => ({
-          id: asset.id,
-          assetType: asset.assetType,
-          name: asset.name
-        }));
+        assets = avatarDetails.assets
+          .filter(a => !['Animation', 'LocalScript', 'Script', 'ModuleScript', 'Emote', 'ParticleEmitter'].includes(a.assetType))
+          .map(asset => ({
+            id: asset.id,
+            assetType: asset.assetType,
+            name: asset.name
+          }));
       }
     } catch (e) {
       // Continue if assets fail
@@ -59,11 +61,7 @@ export default async function handler(req, res) {
       user,
       profile,
       avatarUrl: thumb,
-      assets,
-      downloadLinks: {
-        r15: `https://www.roblox.com/api/avatar-fetch-model?userId=${userId}&placeId=1`,
-        r6: `https://www.roblox.com/api/avatar-fetch-model?userId=${userId}&placeId=1&r6=true`
-      }
+      assets
     });
   } catch (error) {
     res.status(500).json({ error: error.message || 'Search failed' });

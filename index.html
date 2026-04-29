@@ -55,7 +55,6 @@
     .btn-primary{ background:#5eead4; color:#07201c; font-weight:700; }
     .btn-secondary{ background:#60a5fa; color:#fff; font-weight:700; }
     .btn-success{ background:#34d399; color:#065f46; font-weight:700; }
-    .btn-danger{ background:#f87171; color:#7c2d12; font-weight:700; }
     .content{
       display:grid;
       grid-template-columns:280px 1fr;
@@ -132,7 +131,7 @@
 <body>
   <div class="wrap">
     <h1>🎮 BloxyMart</h1>
-    <p class="muted">Descarga avatares completos de Roblox en R15/R6 con ropa, accesorios y UGCs.</p>
+    <p class="muted">Descarga avatares de Roblox en R15/R6 como archivos OBJ con texturas.</p>
 
     <div class="card">
       <div class="top">
@@ -150,13 +149,13 @@
             <div><strong>User ID:</strong> —</div>
           </div>
           <div class="download-group">
-            <a id="downloadR15" class="btn btn-success" href="#" download="avatar.rbxm">⬇️ R15</a>
-            <a id="downloadR6" class="btn btn-success" href="#" download="avatar.rbxm">⬇️ R6</a>
+            <a id="downloadR15" class="btn btn-success" href="#" download="avatar.zip">⬇️ R15 OBJ</a>
+            <a id="downloadR6" class="btn btn-success" href="#" download="avatar.zip">⬇️ R6 OBJ</a>
           </div>
         </div>
 
         <div class="panel">
-          <h3 style="margin-top:0;">📊 Información</h3>
+          <h3 style="margin-top:0;">📋 Información</h3>
           <div id="status" class="status">Listo para buscar.</div>
 
           <h3>👕 Artículos (Ropa & Accesorios)</h3>
@@ -248,8 +247,8 @@ async function search(){
     rawEl.textContent = JSON.stringify({ user, profile, assetCount: assets.length }, null, 2);
 
     // Setup download buttons
-    downloadR15.href = `javascript:downloadModel('${user.id}', 'r15')`;
-    downloadR6.href = `javascript:downloadModel('${user.id}', 'r6')`;
+    downloadR15.onclick = () => downloadModel(user.id, 'r15');
+    downloadR6.onclick = () => downloadModel(user.id, 'r6');
 
     setStatus('✅ Avatar encontrado. Listo para descargar.');
   }catch(err){
@@ -270,26 +269,25 @@ async function downloadModel(userId, type) {
     });
 
     if (!res.ok) {
-      throw new Error('Error en la descarga');
+      const error = await res.json();
+      throw new Error(error.error || 'Error en la descarga');
     }
 
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `avatar_${userId}_${type}.rbxm`;
+    a.download = `avatar_${userId}_${type}.zip`;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
 
-    setStatus(`✅ Descarga de ${type.toUpperCase()} completada.`);
+    setStatus(`✅ Descarga de ${type.toUpperCase()} completada. Abre con Blender o 3DS Max.`);
   } catch (err) {
     setStatus(`Error: ${err.message}`, true);
   }
 }
-
-window.downloadModel = downloadModel;
 
 function clearAll(){
   usernameEl.value = '';
@@ -301,8 +299,6 @@ function clearAll(){
   `;
   wearingEl.innerHTML = '<div class="chip">Sin datos</div>';
   rawEl.textContent = '—';
-  downloadR15.href = '#';
-  downloadR6.href = '#';
   currentUserId = null;
   setStatus('Listo para buscar.');
 }
