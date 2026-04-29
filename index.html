@@ -1,313 +1,111 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>BloxyMart - Roblox Avatar Downloader</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BloxyMart</title>
   <style>
-    body{
-      margin:0;
-      font-family:Arial,sans-serif;
-      background:#0b1220;
-      color:#fff;
-    }
-    .wrap{
-      max-width:1000px;
-      margin:0 auto;
-      padding:24px;
-    }
-    .card{
-      background:#111b2e;
-      border:1px solid #22304d;
-      border-radius:16px;
-      overflow:hidden;
-    }
-    .top{
-      padding:16px;
-      border-bottom:1px solid #22304d;
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-    input, button, a{
-      font-size:16px;
-      border-radius:12px;
-    }
-    input{
-      flex:1;
-      min-width:240px;
-      padding:12px 14px;
-      border:1px solid #2b3a5b;
-      background:#0f172a;
-      color:#fff;
-      outline:none;
-    }
-    button, a.btn{
-      padding:12px 16px;
-      border:0;
-      cursor:pointer;
-      text-decoration:none;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      gap:8px;
-    }
-    .btn-primary{ background:#5eead4; color:#07201c; font-weight:700; }
-    .btn-secondary{ background:#60a5fa; color:#fff; font-weight:700; }
-    .btn-success{ background:#34d399; color:#065f46; font-weight:700; }
-    .content{
-      display:grid;
-      grid-template-columns:280px 1fr;
-      gap:16px;
-      padding:16px;
-    }
-    .panel{
-      background:#0f172a;
-      border:1px solid #22304d;
-      border-radius:14px;
-      padding:14px;
-    }
-    img{
-      width:100%;
-      aspect-ratio:1/1;
-      object-fit:cover;
-      border-radius:12px;
-      background:#08101f;
-      border:1px solid #22304d;
-    }
-    .muted{ color:#9fb1d1; }
-    .status{ margin-top:10px; min-height:24px; color:#9fb1d1; }
-    .error{ color:#fb7185; }
-    .success{ color:#34d399; }
-    .chips{ display:flex; flex-wrap:wrap; gap:8px; }
-    .chip{
-      padding:8px 10px;
-      border-radius:999px;
-      background:#16233c;
-      border:1px solid #2b3a5b;
-      color:#cfe3ff;
-      font-size:14px;
-    }
-    pre{
-      white-space:pre-wrap;
-      word-break:break-word;
-      margin:0;
-      color:#cbd5e1;
-      background:#08101f;
-      border:1px solid #22304d;
-      border-radius:12px;
-      padding:12px;
-      max-height:300px;
-      overflow-y:auto;
-    }
-    .download-group {
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      margin-top:12px;
-    }
-    .asset-list {
-      max-height:200px;
-      overflow-y:auto;
-      border:1px solid #22304d;
-      border-radius:8px;
-      padding:8px;
-    }
-    .asset-item {
-      padding:8px;
-      background:#08101f;
-      border-radius:6px;
-      margin-bottom:6px;
-      border-left:3px solid #5eead4;
-      font-size:13px;
-    }
-    @media (max-width: 760px){
-      .content{ grid-template-columns:1fr; }
-      .download-group { flex-direction:column; }
-      .btn { width:100%; justify-content:center; }
-    }
+    /* simplified styles for clarity */
+    body{font-family:Arial,Helvetica,sans-serif;background:#071029;color:#e6eef8;margin:0}
+    .wrap{max-width:980px;margin:24px auto;padding:18px}
+    .card{background:#071a2b;border-radius:12px;padding:14px}
+    .top{display:flex;gap:8px}
+    input{flex:1;padding:10px;border-radius:8px;border:1px solid #123}
+    button,a{padding:10px 12px;border-radius:8px;border:0;cursor:pointer}
+    .btn-primary{background:#5eead4;color:#042825}
+    .btn-success{background:#34d399;color:#044231}
+    .panel{display:flex;gap:12px;align-items:flex-start}
+    img{width:160px;height:160px;border-radius:8px;object-fit:cover}
+    pre{background:#021224;padding:10px;border-radius:8px;color:#cfe3ff;overflow:auto}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>🎮 BloxyMart</h1>
-    <p class="muted">Descarga avatares de Roblox en R15/R6 como archivos OBJ con texturas.</p>
-
     <div class="card">
       <div class="top">
         <input id="username" placeholder="Username de Roblox" />
-        <button id="btnSearch" class="btn-primary">🔍 Buscar</button>
-        <button id="btnClear" class="btn-secondary">🗑️ Limpiar</button>
+        <button id="btnSearch" class="btn-primary">Buscar</button>
+        <button id="btnClear">Limpiar</button>
       </div>
-
-      <div class="content">
-        <div class="panel">
-          <img id="avatarPreview" alt="Preview" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 420'><rect width='420' height='420' rx='24' fill='%2308101f'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239fb1d1' font-family='Arial' font-size='20'>Sin preview</text></svg>">
-          <div id="meta" class="muted" style="margin-top:12px; line-height:1.6;">
-            <div><strong>Usuario:</strong> —</div>
-            <div><strong>Display:</strong> —</div>
-            <div><strong>User ID:</strong> —</div>
-          </div>
-          <div class="download-group">
-            <a id="downloadR15" class="btn btn-success" href="#" download="avatar.zip">⬇️ R15 OBJ</a>
-            <a id="downloadR6" class="btn btn-success" href="#" download="avatar.zip">⬇️ R6 OBJ</a>
+      <hr />
+      <div class="panel">
+        <div>
+          <img id="avatarPreview" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'><rect width='160' height='160' fill='%23010f1a'/><text x='50%' y='50%' fill='%239fb1d1' font-size='12' text-anchor='middle' dominant-baseline='middle'>Sin preview</text></svg>" alt="preview">
+          <div style="margin-top:8px">
+            <a id="downloadR15" class="btn-success" href="#">⬇️ R15 OBJ</a>
+            <a id="downloadR6" class="btn-success" href="#">⬇️ R6 OBJ</a>
           </div>
         </div>
-
-        <div class="panel">
-          <h3 style="margin-top:0;">📋 Información</h3>
-          <div id="status" class="status">Listo para buscar.</div>
-
-          <h3>👕 Artículos (Ropa & Accesorios)</h3>
-          <div id="wearing" class="asset-list">
-            <div class="chip">Sin datos</div>
-          </div>
-
-          <h3>📦 Datos Completos</h3>
+        <div style="flex:1">
+          <div id="meta">Usuario: — / Display: — / ID: —</div>
+          <h4>Artículos</h4>
+          <div id="wearing">—</div>
+          <h4>Respuesta cruda</h4>
           <pre id="raw">—</pre>
         </div>
       </div>
     </div>
   </div>
-
 <script>
 const usernameEl = document.getElementById('username');
 const btnSearch = document.getElementById('btnSearch');
 const btnClear = document.getElementById('btnClear');
 const avatarPreview = document.getElementById('avatarPreview');
 const meta = document.getElementById('meta');
-const statusEl = document.getElementById('status');
-const wearingEl = document.getElementById('wearing');
 const rawEl = document.getElementById('raw');
+const wearingEl = document.getElementById('wearing');
 const downloadR15 = document.getElementById('downloadR15');
 const downloadR6 = document.getElementById('downloadR6');
 
 let currentUserId = null;
 
-function setStatus(msg, error=false){
-  statusEl.textContent = msg;
-  statusEl.className = error ? 'status error' : 'status';
+function setStatus(msg, isError){
+  meta.textContent = msg;
+  if(isError) meta.style.color = '#f88'; else meta.style.color = '#cfe3ff';
 }
 
-function escapeHtml(s){
-  return String(s)
-    .replaceAll('&','&amp;')
-    .replaceAll('<','&lt;')
-    .replaceAll('>','&gt;')
-    .replaceAll('"','&quot;')
-    .replaceAll("'","&#39;");
+async function safeJson(res){
+  const ct = res.headers.get('content-type') || '';
+  if(ct.includes('application/json')) return res.json();
+  // try json, fallback to text
+  try{ return await res.json(); }catch(e){ const text = await res.text(); return { error: text }; }
 }
 
 async function search(){
-  const username = usernameEl.value.trim();
-  if(!username){
-    setStatus('Escribe un username.', true);
-    return;
-  }
-
-  btnSearch.disabled = true;
-  setStatus('Buscando...');
-
+  const username = usernameEl.value.trim(); if(!username){ setStatus('Escribe un username', true); return }
+  btnSearch.disabled = true; setStatus('Buscando...');
   try{
-    const res = await fetch('/api/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username })
-    });
-
-    if(!res.ok) {
-      const error = await res.json();
-      throw new Error(error.error || 'No encontré ese usuario.');
-    }
-
-    const data = await res.json();
+    const res = await fetch('/api/search', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ username }) });
+    const data = await safeJson(res);
+    if(!res.ok) throw new Error(data.error || data || 'Error buscando');
     const { user, profile, avatarUrl, assets } = data;
     currentUserId = user.id;
-
-    if(avatarUrl) avatarPreview.src = avatarUrl;
-
-    meta.innerHTML = `
-      <div><strong>Usuario:</strong> ${escapeHtml(profile.name || username)}</div>
-      <div><strong>Display:</strong> ${escapeHtml(profile.displayName || '—')}</div>
-      <div><strong>User ID:</strong> ${escapeHtml(user.id)}</div>
-    `;
-
-    // Display assets
-    if(assets && assets.length > 0) {
-      wearingEl.innerHTML = assets.map(asset => `
-        <div class="asset-item">
-          <strong>${escapeHtml(asset.name || 'Unknown')}</strong><br>
-          <small>ID: ${asset.id} | Tipo: ${asset.assetType}</small>
-        </div>
-      `).join('');
-    } else {
-      wearingEl.innerHTML = '<div class="chip">Sin artículos adicionales</div>';
-    }
-
-    rawEl.textContent = JSON.stringify({ user, profile, assetCount: assets.length }, null, 2);
-
-    // Setup download buttons
-    downloadR15.onclick = () => downloadModel(user.id, 'r15');
-    downloadR6.onclick = () => downloadModel(user.id, 'r6');
-
-    setStatus('✅ Avatar encontrado. Listo para descargar.');
-  }catch(err){
-    setStatus(err.message || 'Falló la búsqueda.', true);
-  }finally{
-    btnSearch.disabled = false;
-  }
+    avatarPreview.src = avatarUrl || avatarPreview.src;
+    meta.innerHTML = `Usuario: ${profile.name} / Display: ${profile.displayName || '—'} / ID: ${user.id}`;
+    wearingEl.innerHTML = assets && assets.length ? assets.map(a=> `<div>${a.name} (${a.assetType}) #${a.id}</div>`).join('') : 'Sin artículos';
+    rawEl.textContent = JSON.stringify(data, null, 2);
+    downloadR15.onclick = ()=> downloadModel(user.id,'r15');
+    downloadR6.onclick = ()=> downloadModel(user.id,'r6');
+  }catch(err){ setStatus('Error: '+err.message, true); }
+  finally{ btnSearch.disabled = false }
 }
 
-async function downloadModel(userId, type) {
-  try {
-    setStatus(`⬇️ Descargando ${type.toUpperCase()}...`);
-    
-    const res = await fetch('/api/download', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, type })
-    });
-
-    if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.error || 'Error en la descarga');
-    }
-
+async function downloadModel(userId, type){
+  if(!userId){ setStatus('No user selected', true); return }
+  try{
+    setStatus('Descargando ZIP...');
+    const res = await fetch('/api/download', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ userId, type }) });
+    if(!res.ok){ const data = await safeJson(res); throw new Error(data.error || 'Descarga fallida'); }
     const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `avatar_${userId}_${type}.zip`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-
-    setStatus(`✅ Descarga de ${type.toUpperCase()} completada. Abre con Blender o 3DS Max.`);
-  } catch (err) {
-    setStatus(`Error: ${err.message}`, true);
-  }
-}
-
-function clearAll(){
-  usernameEl.value = '';
-  avatarPreview.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 420'><rect width='420' height='420' rx='24' fill='%2308101f'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239fb1d1' font-family='Arial' font-size='20'>Sin preview</text></svg>";
-  meta.innerHTML = `
-    <div><strong>Usuario:</strong> —</div>
-    <div><strong>Display:</strong> —</div>
-    <div><strong>User ID:</strong> —</div>
-  `;
-  wearingEl.innerHTML = '<div class="chip">Sin datos</div>';
-  rawEl.textContent = '—';
-  currentUserId = null;
-  setStatus('Listo para buscar.');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `avatar_${userId}_${type}.zip`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    setStatus('Descarga completada');
+  }catch(err){ setStatus('Error: '+err.message, true); }
 }
 
 btnSearch.addEventListener('click', search);
-btnClear.addEventListener('click', clearAll);
-usernameEl.addEventListener('keydown', (e) => {
-  if(e.key === 'Enter') search();
-});
+btnClear.addEventListener('click', ()=>{ usernameEl.value=''; avatarPreview.src='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><rect width="160" height="160" fill="%23010f1a"/><text x="50%" y="50%" fill="%239fb1d1" font-size="12" text-anchor="middle" dominant-baseline="middle">Sin preview</text></svg>'; meta.textContent='Usuario: — / Display: — / ID: —'; wearingEl.innerHTML='—'; rawEl.textContent='—'; currentUserId=null })
+
 </script>
 </body>
 </html>

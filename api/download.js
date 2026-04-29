@@ -1,17 +1,4 @@
-import fetch from 'node-fetch';
 import JSZip from 'jszip';
-
-const ASSET_API = 'https://assetdelivery.roblox.com/v2/assetId/';
-
-async function downloadAsset(assetId) {
-  try {
-    const response = await fetch(`${ASSET_API}${assetId}`);
-    if (!response.ok) return null;
-    return await response.buffer();
-  } catch (error) {
-    return null;
-  }
-}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -25,120 +12,102 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Get avatar details
+    // Fetch avatar details
     const avatarRes = await fetch(`https://avatar.roblox.com/v1/users/${userId}/avatar`);
-    if (!avatarRes.ok) throw new Error('Failed to fetch avatar');
-    
+    if (!avatarRes.ok) throw new Error('Failed to fetch avatar details from Roblox');
     const avatarData = await avatarRes.json();
+
     const zip = new JSZip();
-    
-    let objContent = '# BloxyMart - Roblox Avatar OBJ Model\n';
-    objContent += `# User ID: ${userId}\n`;
-    objContent += `# Type: ${type}\n\n`;
-    
-    let vertexOffset = 1;
-    const textures = new Set();
-    
-    // Process each asset (clothes, accessories, etc)
-    if (avatarData.assets) {
+    let objLines = [];
+
+    objLines.push('# BloxyMart - Roblox Avatar OBJ Model');
+    objLines.push(`# User ID: ${userId}`);
+    objLines.push(`# Type: ${type}`);
+    objLines.push('');
+
+    // Simple placeholder body mesh (users can edit/replace in Blender)
+    if (type === 'r15') {
+      objLines.push('o body_r15');
+      objLines.push('v -0.5 0 0.5');
+      objLines.push('v 0.5 0 0.5');
+      objLines.push('v 0.5 1.5 0.5');
+      objLines.push('v -0.5 1.5 0.5');
+      objLines.push('v -0.5 0 -0.5');
+      objLines.push('v 0.5 0 -0.5');
+      objLines.push('v 0.5 1.5 -0.5');
+      objLines.push('v -0.5 1.5 -0.5');
+      objLines.push('f 1 2 3 4');
+      objLines.push('f 5 8 7 6');
+      objLines.push('f 1 5 6 2');
+      objLines.push('f 2 6 7 3');
+      objLines.push('f 3 7 8 4');
+      objLines.push('f 5 1 4 8');
+    } else {
+      objLines.push('o body_r6');
+      objLines.push('v -0.5 0 0.5');
+      objLines.push('v 0.5 0 0.5');
+      objLines.push('v 0.5 1.7 0.5');
+      objLines.push('v -0.5 1.7 0.5');
+      objLines.push('v -0.5 0 -0.5');
+      objLines.push('v 0.5 0 -0.5');
+      objLines.push('v 0.5 1.7 -0.5');
+      objLines.push('v -0.5 1.7 -0.5');
+      objLines.push('f 1 2 3 4');
+      objLines.push('f 5 8 7 6');
+      objLines.push('f 1 5 6 2');
+      objLines.push('f 2 6 7 3');
+      objLines.push('f 3 7 8 4');
+      objLines.push('f 5 1 4 8');
+    }
+
+    // Add basic thumbnail texture
+    try {
+      const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=420x420&format=Png&isCircular=false`);
+      if (thumbRes.ok) {
+        const arr = await thumbRes.arrayBuffer();
+        const buffer = Buffer.from(arr);
+        zip.file('textures/avatar_thumbnail.png', buffer);
+        // reference the texture in the OBJ Material (simple MTL file)
+        const mtl = `newmtl mat0\nKa 1.000 1.000 1.000\nKd 1.000 1.000 1.000\nKs 0.000 0.000 0.000\nmap_Kd textures/avatar_thumbnail.png\n`;
+        zip.file('avatar.mtl', mtl);
+        objLines.unshift(`mtllib avatar.mtl`);
+        objLines.push('usemtl mat0');
+      }
+    } catch (e) {
+      // ignore thumbnail errors
+      console.error('Thumbnail fetch failed', e.message);
+    }
+
+    // Attempt to include simple meshes for wearable assets
+    if (avatarData.assets && Array.isArray(avatarData.assets)) {
       for (const asset of avatarData.assets) {
-        // Skip scripts, animations, etc
-        const skipTypes = ['Animation', 'LocalScript', 'Script', 'ModuleScript', 'Emote'];
+        // Skip non-mesh types
+        const skipTypes = ['Animation', 'LocalScript', 'Script', 'ModuleScript', 'Emote', 'ParticleEmitter', 'Sound'];
         if (skipTypes.includes(asset.assetType)) continue;
-        
+
+        // Try to fetch an OBJ-like representation from Roblox (best-effort)
         try {
-          // Get asset mesh data
-          const meshRes = await fetch(`https://www.roblox.com/api/asset?id=${asset.id}`);
-          if (!meshRes.ok) continue;
-          
-          const meshData = await meshRes.text();
-          
-          // Parse mesh (basic OBJ format)
-          if (meshData.includes('v ')) {
-            objContent += `# Asset: ${asset.name}\n`;
-            objContent += meshData + '\n';
-          }
+          // There's no official OBJ CDN; try asset delivery for mesh files (binary). We won't try to parse mesh formats here.
+          // Instead, include an entry in the README listing the asset IDs so users can fetch them manually if needed.
+          // This prevents server-side parsing errors and keeps the service stable.
+          objLines.push(`# Asset: ${asset.name} (id: ${asset.id}, type: ${asset.assetType})`);
         } catch (e) {
-          console.error(`Error processing asset ${asset.id}:`, e.message);
+          console.error(`Failed to process asset ${asset.id}:`, e.message);
         }
       }
     }
-    
-    // Add basic character body mesh
-    objContent += `# Character Body\n`;
-    objContent += `o ${type}_Body\n`;
-    objContent += createCharacterMesh(type, vertexOffset);
-    
-    // Add OBJ to zip
-    zip.file('avatar.obj', objContent);
-    
-    // Try to get and add avatar thumbnail as texture
-    try {
-      const thumbRes = await fetch(
-        `https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=420x420&format=Png&isCircular=false`
-      );
-      if (thumbRes.ok) {
-        const thumbBuffer = await thumbRes.buffer();
-        zip.file('textures/avatar_thumbnail.png', thumbBuffer);
-      }
-    } catch (e) {
-      console.error('Error downloading thumbnail:', e.message);
-    }
-    
-    // Add README
-    zip.file('README.txt', `BloxyMart Avatar Model\nUser ID: ${userId}\nType: ${type}\n\nContains:\n- avatar.obj (3D model)\n- textures/ (image files)\n\nOpen avatar.obj in Blender, 3DS Max, or any 3D software.`);
-    
-    // Generate zip and send
+
+    zip.file('avatar.obj', objLines.join('\n'));
+    zip.file('README.txt', `BloxyMart Avatar OBJ\nUser ID: ${userId}\nType: ${type}\n\nIncluded:\n- avatar.obj\n- avatar.mtl (if thumbnail available)\n- textures/avatar_thumbnail.png (if available)\n\nNotes:\n- This service creates a basic OBJ with a placeholder body and references to textures.\n- Full mesh extraction from Roblox proprietary formats requires more complex processing and different tooling.\n- Asset list is included as comments in avatar.obj.`);
+
     const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
-    
+
     res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="avatar_${userId}_${type}.zip"`);
-    res.send(zipBuffer);
-    
+    res.setHeader('Content-Disposition', `attachment; filename=avatar_${userId}_${type}.zip`);
+    res.status(200).send(zipBuffer);
   } catch (error) {
     console.error('Download error:', error);
-    res.status(500).json({ error: error.message || 'Download failed' });
-  }
-}
-
-function createCharacterMesh(type, vertexOffset) {
-  if (type === 'r15') {
-    // R15 body parts
-    return `
-v -0.5 0 0.5
-v 0.5 0 0.5
-v 0.5 1.5 0.5
-v -0.5 1.5 0.5
-v -0.5 0 -0.5
-v 0.5 0 -0.5
-v 0.5 1.5 -0.5
-v -0.5 1.5 -0.5
-
-f 1 2 3 4
-f 5 8 7 6
-f 1 5 6 2
-f 2 6 7 3
-f 3 7 8 4
-f 5 1 4 8
-`;
-  } else {
-    // R6 body parts
-    return `
-v -0.5 0 0.5
-v 0.5 0 0.5
-v 0.5 1.7 0.5
-v -0.5 1.7 0.5
-v -0.5 0 -0.5
-v 0.5 0 -0.5
-v 0.5 1.7 -0.5
-v -0.5 1.7 -0.5
-
-f 1 2 3 4
-f 5 8 7 6
-f 1 5 6 2
-f 2 6 7 3
-f 3 7 8 4
-f 5 1 4 8
-`;
+    // Always return JSON for errors so frontend can parse it safely
+    res.status(500).json({ error: String(error.message || 'Download failed') });
   }
 }
