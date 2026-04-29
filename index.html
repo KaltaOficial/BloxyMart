@@ -167,15 +167,6 @@ function escapeHtml(s){
     .replaceAll("'","&#39;");
 }
 
-async function api(path, options={}){
-  const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options
-  });
-  if(!res.ok) throw new Error(`Error HTTP ${res.status}`);
-  return await res.json();
-}
-
 function makeObj(username){
   const safe = (username || 'avatar').replace(/[^a-zA-Z0-9_\-]/g, '_');
   const obj = `# OBJ básico de BloxyMart
@@ -227,38 +218,26 @@ async function search(){
   setStatus('Buscando...');
 
   try{
-    // Usar API pública de Roblox
-    const userRes = await fetch(`https://users.roblox.com/v1/usernames/users`, {
+    const res = await fetch('/api/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ usernames: [username], excludeBannedUsers: false })
+      body: JSON.stringify({ username })
     });
-    
-    if(!userRes.ok) throw new Error('No encontré ese usuario.');
-    const userData = await userRes.json();
-    
-    if(!userData.data || userData.data.length === 0){
-      throw new Error('No encontré ese usuario.');
+
+    if(!res.ok) {
+      const error = await res.json();
+      throw new Error(error.error || 'No encontré ese usuario.');
     }
 
-    const user = userData.data[0];
-    const userId = user.id;
+    const data = await res.json();
+    const { user, profile, avatarUrl } = data;
 
-    // Obtener perfil del usuario
-    const profileRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
-    const profile = await profileRes.json();
-
-    // Obtener avatar
-    const avatarRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=420x420&format=Png&isCircular=false`);
-    const avatarData = await avatarRes.json();
-    const thumb = avatarData.data?.[0]?.imageUrl || '';
-
-    if(thumb) avatarPreview.src = thumb;
+    if(avatarUrl) avatarPreview.src = avatarUrl;
 
     meta.innerHTML = `
       <div><strong>Usuario:</strong> ${escapeHtml(profile.name || username)}</div>
       <div><strong>Display:</strong> ${escapeHtml(profile.displayName || '—')}</div>
-      <div><strong>User ID:</strong> ${escapeHtml(userId)}</div>
+      <div><strong>User ID:</strong> ${escapeHtml(user.id)}</div>
     `;
 
     wearingEl.innerHTML = `<span class="chip">Sin datos</span>`;
