@@ -15,6 +15,12 @@ function extFromContentType(ct) {
   return 'bin';
 }
 
+async function fetchArrayBufferSafe(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  return await res.arrayBuffer();
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -35,14 +41,15 @@ export default async function handler(req, res) {
     const texturesFolder = zip.folder('textures');
     const assetsFolder = zip.folder('assets');
 
-    // Start building OBJ
+    // Start building OBJ and MTL
     const objLines = [];
+    const mtlLines = [];
     objLines.push(`# BloxyMart - Roblox Avatar OBJ Model`);
     objLines.push(`# User ID: ${userId}`);
     objLines.push(`# Type: ${type}`);
     objLines.push('');
 
-    // Add placeholder body vertices (keeps model usable)
+    // Add placeholder body vertices (so model opens without being empty)
     if (type === 'r15') {
       objLines.push('o body_r15');
       objLines.push('v -0.5 0 0.5');
@@ -77,7 +84,7 @@ export default async function handler(req, res) {
       objLines.push('f 5 1 4 8');
     }
 
-    // Fetch thumbnail and add as texture
+    // Fetch avatar thumbnail and include as texture if available
     try {
       const thumbRes = await fetch(
         `https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=420x420&format=Png&isCircular=false`
@@ -86,14 +93,20 @@ export default async function handler(req, res) {
         const arr = await thumbRes.arrayBuffer();
         const buffer = Buffer.from(arr);
         texturesFolder.file(`avatar_thumbnail.png`, buffer);
+        // Add MTL reference for thumbnail as default material
+        mtlLines.push(`newmtl avatar_thumb`);
+        mtlLines.push(`Ka 1.000 1.000 1.000`);
+        mtlLines.push(`Kd 1.000 1.000 1.000`);
+        mtlLines.push(`Ks 0.000 0.000 0.000`);
+        mtlLines.push(`map_Kd textures/avatar_thumbnail.png`);
         objLines.unshift('mtllib avatar.mtl');
-        objLines.push('usemtl mat0');
+        objLines.push('usemtl avatar_thumb');
       }
     } catch (e) {
       console.error('Thumbnail error:', e.message);
     }
 
-    // Process wearable assets - best-effort: attempt to download their assetbinary and textures
+    // Process wearable assets: download raw file + try to download thumbnail via thumbnails.roblox.com
     const assets = Array.isArray(avatarData.assets) ? avatarData.assets : [];
     const readmeLines = [];
     readmeLines.push(`BloxyMart Avatar OBJ`);
@@ -102,54 +115,100 @@ export default async function handler(req, res) {
     readmeLines.push('');
     readmeLines.push('Included:');
     readmeLines.push('- avatar.obj');
-    readmeLines.push('- textures/ (thumbnail + any downloaded images)');
+    readmeLines.push('- avatar.mtl (if textures present)');
+    readmeLines.push('- textures/ (downloaded thumbnails and images)');
     readmeLines.push('- assets/ (raw asset files when available)');
     readmeLines.push('');
     readmeLines.push('Asset list:');
 
     for (const asset of assets) {
       try {
-        // Skip non-relevant asset types
         const skipTypes = ['Animation', 'LocalScript', 'Script', 'ModuleScript', 'Emote', 'ParticleEmitter', 'Sound'];
         if (skipTypes.includes(asset.assetType)) {
-          readmeLines.push(`# Skipped asset ${asset.id} (${asset.assetType})`);
+          readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - skipped type: ${asset.assetType}`);
           continue;
         }
 
-        // Try to download via assetdelivery endpoint
+        // Attempt to download raw asset binary
         const adUrl = `https://assetdelivery.roblox.com/v2/assetId/${asset.id}`;
-        const aRes = await fetch(adUrl);
-        if (!aRes.ok) {
-          // sometimes assetdelivery responds with 403 or HTML; log and continue
-          const txt = await aRes.text().catch(() => '');
-          console.error(`Asset ${asset.id} download failed: ${aRes.status}`, txt.slice(0,200));
-          readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - download failed: ${aRes.status}`);
-          continue;
+        let savedAssetFilename = null;
+        try {
+          const aRes = await fetch(adUrl);
+          if (aRes.ok) {
+            const ct = (aRes.headers.get('content-type') || '').toLowerCase();
+            const ext = extFromContentType(ct);
+            // If content-type looks like html/json it's probably not a raw file
+            if (ct.includes('text/html') || ct.includes('application/json')) {
+              const txt = await aRes.text().catch(() => '');
+              readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - asset delivery returned ${ct}`);
+            } else {
+              const arr = await aRes.arrayBuffer();
+              const buffer = Buffer.from(arr);
+              const filename = `asset_${asset.id}.${ext}`;
+              assetsFolder.file(filename, buffer);
+              savedAssetFilename = `assets/${filename}`;
+              readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) -> ${savedAssetFilename}`);
+              // if image, also add to textures
+              if (ct.startsWith('image/')) {
+                texturesFolder.file(`${asset.id}.${ext}`, buffer);
+                // add material
+                mtlLines.push(`newmtl mat_${asset.id}`);
+                mtlLines.push(`Ka 1.000 1.000 1.000`);
+                mtlLines.push(`Kd 1.000 1.000 1.000`);
+                mtlLines.push(`Ks 0.000 0.000 0.000`);
+                mtlLines.push(`map_Kd textures/${asset.id}.${ext}`);
+                objLines.push(`o asset_${asset.id}`);
+                objLines.push(`# asset ${asset.id} material mat_${asset.id}`);
+                objLines.push('usemtl mat_' + asset.id);
+                // no geometry because we can't parse binary meshes here
+              }
+            }
+          } else {
+            const txt = await aRes.text().catch(() => '');
+            readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - asset delivery failed: ${aRes.status}`);
+            console.error(`Asset download failed ${asset.id}:`, aRes.status, txt.slice(0,200));
+          }
+        } catch (e) {
+          console.error(`Asset delivery error ${asset.id}:`, e.message);
+          readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - delivery error: ${e.message}`);
         }
 
-        // Determine content-type and extension
-        const ct = (aRes.headers.get('content-type') || '').toLowerCase();
-        const ext = extFromContentType(ct);
-
-        // If it's JSON or HTML, skip saving as binary
-        if (ct.includes('application/json') || ct.includes('text/html')) {
-          const txt = await aRes.text().catch(() => '');
-          readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - unexpected content-type: ${ct}`);
-          continue;
-        }
-
-        // Get final fetched data as arrayBuffer
-        const arr = await aRes.arrayBuffer();
-        const buffer = Buffer.from(arr);
-
-        // Save asset binary
-        const filename = `asset_${asset.id}.${ext}`;
-        assetsFolder.file(filename, buffer);
-        readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) -> assets/${filename}`);
-
-        // If it's an image, also add to textures folder
-        if (ct.startsWith('image/')) {
-          texturesFolder.file(`${asset.id}.${ext}`, buffer);
+        // Always try thumbnails API to get a preview texture for the asset
+        try {
+          const thumbApi = `https://thumbnails.roblox.com/v1/assets?assetIds=${asset.id}&size=420x420&format=Png&isCircular=false`;
+          const tRes = await fetch(thumbApi);
+          if (tRes.ok) {
+            const tData = await tRes.json();
+            const url = tData?.data?.[0]?.imageUrl;
+            if (url) {
+              try {
+                const arr = await fetchArrayBufferSafe(url);
+                const buffer = Buffer.from(arr);
+                const filename = `asset_${asset.id}_thumb.png`;
+                texturesFolder.file(filename, buffer);
+                readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) thumbnail -> textures/${filename}`);
+                // add material referencing this thumbnail
+                mtlLines.push(`newmtl thumb_${asset.id}`);
+                mtlLines.push(`Ka 1.000 1.000 1.000`);
+                mtlLines.push(`Kd 1.000 1.000 1.000`);
+                mtlLines.push(`Ks 0.000 0.000 0.000`);
+                mtlLines.push(`map_Kd textures/${filename}`);
+                objLines.push(`o asset_${asset.id}_thumb`);
+                objLines.push(`# asset ${asset.id} thumbnail material thumb_${asset.id}`);
+                objLines.push('usemtl thumb_' + asset.id);
+              } catch (e) {
+                console.error(`Failed to download thumbnail URL for asset ${asset.id}:`, e.message);
+              }
+            } else {
+              readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - no thumbnail URL`);
+            }
+          } else {
+            const txt = await tRes.text().catch(() => '');
+            readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - thumbnail API failed: ${tRes.status}`);
+          }
+        } catch (e) {
+          console.error(`Thumbnail API error for asset ${asset.id}:`, e.message);
+          readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - thumbnail error: ${e.message}`);
         }
 
       } catch (e) {
@@ -158,7 +217,13 @@ export default async function handler(req, res) {
       }
     }
 
-    // Write avatar.obj and README
+    // If we have MTL lines, write avatar.mtl and reference it
+    if (mtlLines.length > 0) {
+      zip.file('avatar.mtl', mtlLines.join('\n'));
+      // ensure mtllib is first line
+      if (!objLines[0].startsWith('mtllib')) objLines.unshift('mtllib avatar.mtl');
+    }
+
     zip.file('avatar.obj', objLines.join('\n'));
     zip.file('README.txt', readmeLines.join('\n'));
 
