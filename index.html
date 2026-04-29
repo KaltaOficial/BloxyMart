@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BloxyMart - Roblox Avatar Downloader</title>
+  <style>
+    body{
+      margin:0;
+      font-family:Arial,sans-serif;
+      background:#0b1220;
+      color:#fff;
+    }
+    .wrap{
+      max-width:1000px;
+      margin:0 auto;
+      padding:24px;
+    }
+    .card{
+      background:#111b2e;
+      border:1px solid #22304d;
+      border-radius:16px;
+      overflow:hidden;
+    }
+    .top{
+      padding:16px;
+      border-bottom:1px solid #22304d;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    input, button, a{
+      font-size:16px;
+      border-radius:12px;
+    }
+    input{
+      flex:1;
+      min-width:240px;
+      padding:12px 14px;
+      border:1px solid #2b3a5b;
+      background:#0f172a;
+      color:#fff;
+      outline:none;
+    }
+    button, a.btn{
+      padding:12px 16px;
+      border:0;
+      cursor:pointer;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .btn-primary{ background:#5eead4; color:#07201c; font-weight:700; }
+    .btn-secondary{ background:#60a5fa; color:#fff; font-weight:700; }
+    .content{
+      display:grid;
+      grid-template-columns:280px 1fr;
+      gap:16px;
+      padding:16px;
+    }
+    .panel{
+      background:#0f172a;
+      border:1px solid #22304d;
+      border-radius:14px;
+      padding:14px;
+    }
+    img{
+      width:100%;
+      aspect-ratio:1/1;
+      object-fit:cover;
+      border-radius:12px;
+      background:#08101f;
+      border:1px solid #22304d;
+    }
+    .muted{ color:#9fb1d1; }
+    .status{ margin-top:10px; min-height:24px; color:#9fb1d1; }
+    .error{ color:#fb7185; }
+    .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+    .chip{
+      padding:8px 10px;
+      border-radius:999px;
+      background:#16233c;
+      border:1px solid #2b3a5b;
+      color:#cfe3ff;
+      font-size:14px;
+    }
+    pre{
+      white-space:pre-wrap;
+      word-break:break-word;
+      margin:0;
+      color:#cbd5e1;
+      background:#08101f;
+      border:1px solid #22304d;
+      border-radius:12px;
+      padding:12px;
+      min-height:180px;
+    }
+    @media (max-width: 760px){
+      .content{ grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>BloxyMart</h1>
+    <p class="muted">Busca un usuario y prepara un OBJ básico.</p>
+
+    <div class="card">
+      <div class="top">
+        <input id="username" placeholder="Username de Roblox" />
+        <button id="btnSearch" class="btn-primary">Buscar</button>
+        <button id="btnClear" class="btn-secondary">Limpiar</button>
+      </div>
+
+      <div class="content">
+        <div class="panel">
+          <img id="avatarPreview" alt="Preview" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 420'><rect width='420' height='420' rx='24' fill='%2308101f'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239fb1d1' font-family='Arial' font-size='20'>Sin preview</text></svg>">
+          <div id="meta" class="muted" style="margin-top:12px; line-height:1.6;">
+            <div><strong>Usuario:</strong> —</div>
+            <div><strong>Display:</strong> —</div>
+            <div><strong>User ID:</strong> —</div>
+          </div>
+          <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+            <a id="downloadObj" class="btn btn-primary" href="#" download="avatar.obj">Descargar .OBJ</a>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 style="margin-top:0;">Resultado</h3>
+          <div id="status" class="status">Listo para buscar.</div>
+
+          <h3>Itens que lleva puestos</h3>
+          <div id="wearing" class="chips" style="margin-bottom:14px;">
+            <span class="chip">Sin datos</span>
+          </div>
+
+          <h3>Respuesta</h3>
+          <pre id="raw">—</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const usernameEl = document.getElementById('username');
+const btnSearch = document.getElementById('btnSearch');
+const btnClear = document.getElementById('btnClear');
+const avatarPreview = document.getElementById('avatarPreview');
+const meta = document.getElementById('meta');
+const statusEl = document.getElementById('status');
+const wearingEl = document.getElementById('wearing');
+const rawEl = document.getElementById('raw');
+const downloadObj = document.getElementById('downloadObj');
+
+function setStatus(msg, error=false){
+  statusEl.textContent = msg;
+  statusEl.className = error ? 'status error' : 'status';
+}
+
+function escapeHtml(s){
+  return String(s)
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'","&#39;");
+}
+
+async function api(path, options={}){
+  const res = await fetch(path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options
+  });
+  if(!res.ok) throw new Error(`Error HTTP ${res.status}`);
+  return await res.json();
+}
+
+function makeObj(username){
+  const safe = (username || 'avatar').replace(/[^a-zA-Z0-9_\-]/g, '_');
+  const obj = `# OBJ básico de BloxyMart
+o ${safe}
+
+v -0.5 0 0.5
+v 0.5 0 0.5
+v 0.5 1.5 0.5
+v -0.5 1.5 0.5
+v -0.5 0 -0.5
+v 0.5 0 -0.5
+v 0.5 1.5 -0.5
+v -0.5 1.5 -0.5
+
+v -0.35 1.5 0.35
+v 0.35 1.5 0.35
+v 0.35 2.1 0.35
+v -0.35 2.1 0.35
+v -0.35 1.5 -0.35
+v 0.35 1.5 -0.35
+v 0.35 2.1 -0.35
+v -0.35 2.1 -0.35
+
+f 1 2 3 4
+f 5 8 7 6
+f 1 5 6 2
+f 2 6 7 3
+f 3 7 8 4
+f 5 1 4 8
+
+f 9 10 11 12
+f 13 16 15 14
+f 9 13 14 10
+f 10 14 15 11
+f 11 15 16 12
+f 13 9 12 16
+`;
+  return URL.createObjectURL(new Blob([obj], { type:'text/plain' }));
+}
+
+async function search(){
+  const username = usernameEl.value.trim();
+  if(!username){
+    setStatus('Escribe un username.', true);
+    return;
+  }
+
+  btnSearch.disabled = true;
+  setStatus('Buscando...');
+
+  try{
+    const searchData = await api('/api/roblox/search', {
+      method:'POST',
+      body: JSON.stringify({ username })
+    });
+
+    if(!searchData?.userId){
+      throw new Error('No encontré ese usuario.');
+    }
+
+    const profile = await api(`/api/roblox/profile?userId=${encodeURIComponent(searchData.userId)}`);
+    let wearing = [];
+    try{
+      const wearData = await api(`/api/roblox/wearing?userId=${encodeURIComponent(searchData.userId)}`);
+      wearing = wearData.assetIds || [];
+    }catch(e){}
+
+    const thumb = profile.thumbnailUrl || searchData.thumbnailUrl || '';
+    if(thumb) avatarPreview.src = thumb;
+
+    meta.innerHTML = `
+      <div><strong>Usuario:</strong> ${escapeHtml(profile.name || searchData.name || username)}</div>
+      <div><strong>Display:</strong> ${escapeHtml(profile.displayName || '—')}</div>
+      <div><strong>User ID:</strong> ${escapeHtml(searchData.userId)}</div>
+    `;
+
+    wearingEl.innerHTML = wearing.length
+      ? wearing.map(id => `<span class="chip">Asset ${escapeHtml(id)}</span>`).join('')
+      : `<span class="chip">Sin datos</span>`;
+
+    rawEl.textContent = JSON.stringify({ searchData, profile, wearing }, null, 2);
+    downloadObj.href = makeObj(profile.name || username);
+    downloadObj.download = `${(profile.name || username).replace(/[^a-zA-Z0-9_\-]/g, '_')}.obj`;
+
+    setStatus('Listo.');
+  }catch(err){
+    setStatus(err.message || 'Falló la búsqueda.', true);
+  }finally{
+    btnSearch.disabled = false;
+  }
+}
+
+function clearAll(){
+  usernameEl.value = '';
+  avatarPreview.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 420'><rect width='420' height='420' rx='24' fill='%2308101f'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239fb1d1' font-family='Arial' font-size='20'>Sin preview</text></svg>";
+  meta.innerHTML = `
+    <div><strong>Usuario:</strong> —</div>
+    <div><strong>Display:</strong> —</div>
+    <div><strong>User ID:</strong> —</div>
+  `;
+  wearingEl.innerHTML = `<span class="chip">Sin datos</span>`;
+  rawEl.textContent = '—';
+  downloadObj.href = '#';
+  setStatus('Listo para buscar.');
+}
+
+btnSearch.addEventListener('click', search);
+btnClear.addEventListener('click', clearAll);
+usernameEl.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter') search();
+});
+</script>
+</body>
+</html>
