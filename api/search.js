@@ -10,6 +10,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Search for user
     const userRes = await fetch('https://users.roblox.com/v1/usernames/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -37,10 +38,32 @@ export default async function handler(req, res) {
     const avatarData = await avatarRes.json();
     const thumb = avatarData.data?.[0]?.imageUrl || '';
 
+    // Get avatar assets (clothing, accessories, etc)
+    let assets = [];
+    try {
+      const assetsRes = await fetch(`https://avatar.roblox.com/v1/users/${userId}/avatar`);
+      const avatarDetails = await assetsRes.json();
+      
+      if (avatarDetails.assets) {
+        assets = avatarDetails.assets.map(asset => ({
+          id: asset.id,
+          assetType: asset.assetType,
+          name: asset.name
+        }));
+      }
+    } catch (e) {
+      // Continue if assets fail
+    }
+
     res.status(200).json({
       user,
       profile,
-      avatarUrl: thumb
+      avatarUrl: thumb,
+      assets,
+      downloadLinks: {
+        r15: `https://www.roblox.com/api/avatar-fetch-model?userId=${userId}&placeId=1`,
+        r6: `https://www.roblox.com/api/avatar-fetch-model?userId=${userId}&placeId=1&r6=true`
+      }
     });
   } catch (error) {
     res.status(500).json({ error: error.message || 'Search failed' });

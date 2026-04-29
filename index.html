@@ -50,9 +50,12 @@
       display:inline-flex;
       align-items:center;
       justify-content:center;
+      gap:8px;
     }
     .btn-primary{ background:#5eead4; color:#07201c; font-weight:700; }
     .btn-secondary{ background:#60a5fa; color:#fff; font-weight:700; }
+    .btn-success{ background:#34d399; color:#065f46; font-weight:700; }
+    .btn-danger{ background:#f87171; color:#7c2d12; font-weight:700; }
     .content{
       display:grid;
       grid-template-columns:280px 1fr;
@@ -76,6 +79,7 @@
     .muted{ color:#9fb1d1; }
     .status{ margin-top:10px; min-height:24px; color:#9fb1d1; }
     .error{ color:#fb7185; }
+    .success{ color:#34d399; }
     .chips{ display:flex; flex-wrap:wrap; gap:8px; }
     .chip{
       padding:8px 10px;
@@ -94,23 +98,47 @@
       border:1px solid #22304d;
       border-radius:12px;
       padding:12px;
-      min-height:180px;
+      max-height:300px;
+      overflow-y:auto;
+    }
+    .download-group {
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:12px;
+    }
+    .asset-list {
+      max-height:200px;
+      overflow-y:auto;
+      border:1px solid #22304d;
+      border-radius:8px;
+      padding:8px;
+    }
+    .asset-item {
+      padding:8px;
+      background:#08101f;
+      border-radius:6px;
+      margin-bottom:6px;
+      border-left:3px solid #5eead4;
+      font-size:13px;
     }
     @media (max-width: 760px){
       .content{ grid-template-columns:1fr; }
+      .download-group { flex-direction:column; }
+      .btn { width:100%; justify-content:center; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>BloxyMart</h1>
-    <p class="muted">Busca un usuario y prepara un OBJ básico.</p>
+    <h1>🎮 BloxyMart</h1>
+    <p class="muted">Descarga avatares completos de Roblox en R15/R6 con ropa, accesorios y UGCs.</p>
 
     <div class="card">
       <div class="top">
         <input id="username" placeholder="Username de Roblox" />
-        <button id="btnSearch" class="btn-primary">Buscar</button>
-        <button id="btnClear" class="btn-secondary">Limpiar</button>
+        <button id="btnSearch" class="btn-primary">🔍 Buscar</button>
+        <button id="btnClear" class="btn-secondary">🗑️ Limpiar</button>
       </div>
 
       <div class="content">
@@ -121,21 +149,22 @@
             <div><strong>Display:</strong> —</div>
             <div><strong>User ID:</strong> —</div>
           </div>
-          <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-            <a id="downloadObj" class="btn btn-primary" href="#" download="avatar.obj">Descargar .OBJ</a>
+          <div class="download-group">
+            <a id="downloadR15" class="btn btn-success" href="#" download="avatar.rbxm">⬇️ R15</a>
+            <a id="downloadR6" class="btn btn-success" href="#" download="avatar.rbxm">⬇️ R6</a>
           </div>
         </div>
 
         <div class="panel">
-          <h3 style="margin-top:0;">Resultado</h3>
+          <h3 style="margin-top:0;">📊 Información</h3>
           <div id="status" class="status">Listo para buscar.</div>
 
-          <h3>Itens que lleva puestos</h3>
-          <div id="wearing" class="chips" style="margin-bottom:14px;">
-            <span class="chip">Sin datos</span>
+          <h3>👕 Artículos (Ropa & Accesorios)</h3>
+          <div id="wearing" class="asset-list">
+            <div class="chip">Sin datos</div>
           </div>
 
-          <h3>Respuesta</h3>
+          <h3>📦 Datos Completos</h3>
           <pre id="raw">—</pre>
         </div>
       </div>
@@ -151,7 +180,10 @@ const meta = document.getElementById('meta');
 const statusEl = document.getElementById('status');
 const wearingEl = document.getElementById('wearing');
 const rawEl = document.getElementById('raw');
-const downloadObj = document.getElementById('downloadObj');
+const downloadR15 = document.getElementById('downloadR15');
+const downloadR6 = document.getElementById('downloadR6');
+
+let currentUserId = null;
 
 function setStatus(msg, error=false){
   statusEl.textContent = msg;
@@ -165,46 +197,6 @@ function escapeHtml(s){
     .replaceAll('>','&gt;')
     .replaceAll('"','&quot;')
     .replaceAll("'","&#39;");
-}
-
-function makeObj(username){
-  const safe = (username || 'avatar').replace(/[^a-zA-Z0-9_\-]/g, '_');
-  const obj = `# OBJ básico de BloxyMart
-o ${safe}
-
-v -0.5 0 0.5
-v 0.5 0 0.5
-v 0.5 1.5 0.5
-v -0.5 1.5 0.5
-v -0.5 0 -0.5
-v 0.5 0 -0.5
-v 0.5 1.5 -0.5
-v -0.5 1.5 -0.5
-
-v -0.35 1.5 0.35
-v 0.35 1.5 0.35
-v 0.35 2.1 0.35
-v -0.35 2.1 0.35
-v -0.35 1.5 -0.35
-v 0.35 1.5 -0.35
-v 0.35 2.1 -0.35
-v -0.35 2.1 -0.35
-
-f 1 2 3 4
-f 5 8 7 6
-f 1 5 6 2
-f 2 6 7 3
-f 3 7 8 4
-f 5 1 4 8
-
-f 9 10 11 12
-f 13 16 15 14
-f 9 13 14 10
-f 10 14 15 11
-f 11 15 16 12
-f 13 9 12 16
-`;
-  return URL.createObjectURL(new Blob([obj], { type:'text/plain' }));
 }
 
 async function search(){
@@ -230,7 +222,8 @@ async function search(){
     }
 
     const data = await res.json();
-    const { user, profile, avatarUrl } = data;
+    const { user, profile, avatarUrl, assets } = data;
+    currentUserId = user.id;
 
     if(avatarUrl) avatarPreview.src = avatarUrl;
 
@@ -240,19 +233,63 @@ async function search(){
       <div><strong>User ID:</strong> ${escapeHtml(user.id)}</div>
     `;
 
-    wearingEl.innerHTML = `<span class="chip">Sin datos</span>`;
+    // Display assets
+    if(assets && assets.length > 0) {
+      wearingEl.innerHTML = assets.map(asset => `
+        <div class="asset-item">
+          <strong>${escapeHtml(asset.name || 'Unknown')}</strong><br>
+          <small>ID: ${asset.id} | Tipo: ${asset.assetType}</small>
+        </div>
+      `).join('');
+    } else {
+      wearingEl.innerHTML = '<div class="chip">Sin artículos adicionales</div>';
+    }
 
-    rawEl.textContent = JSON.stringify({ user, profile }, null, 2);
-    downloadObj.href = makeObj(profile.name || username);
-    downloadObj.download = `${(profile.name || username).replace(/[^a-zA-Z0-9_\-]/g, '_')}.obj`;
+    rawEl.textContent = JSON.stringify({ user, profile, assetCount: assets.length }, null, 2);
 
-    setStatus('Listo.');
+    // Setup download buttons
+    downloadR15.href = `javascript:downloadModel('${user.id}', 'r15')`;
+    downloadR6.href = `javascript:downloadModel('${user.id}', 'r6')`;
+
+    setStatus('✅ Avatar encontrado. Listo para descargar.');
   }catch(err){
     setStatus(err.message || 'Falló la búsqueda.', true);
   }finally{
     btnSearch.disabled = false;
   }
 }
+
+async function downloadModel(userId, type) {
+  try {
+    setStatus(`⬇️ Descargando ${type.toUpperCase()}...`);
+    
+    const res = await fetch('/api/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, type })
+    });
+
+    if (!res.ok) {
+      throw new Error('Error en la descarga');
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `avatar_${userId}_${type}.rbxm`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    setStatus(`✅ Descarga de ${type.toUpperCase()} completada.`);
+  } catch (err) {
+    setStatus(`Error: ${err.message}`, true);
+  }
+}
+
+window.downloadModel = downloadModel;
 
 function clearAll(){
   usernameEl.value = '';
@@ -262,9 +299,11 @@ function clearAll(){
     <div><strong>Display:</strong> —</div>
     <div><strong>User ID:</strong> —</div>
   `;
-  wearingEl.innerHTML = `<span class="chip">Sin datos</span>`;
+  wearingEl.innerHTML = '<div class="chip">Sin datos</div>';
   rawEl.textContent = '—';
-  downloadObj.href = '#';
+  downloadR15.href = '#';
+  downloadR6.href = '#';
+  currentUserId = null;
   setStatus('Listo para buscar.');
 }
 
