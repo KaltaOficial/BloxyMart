@@ -27,10 +27,16 @@ export default async function handler(req, res) {
     const user = userData.data[0];
     const userId = user.id;
 
-    // Get profile
-    const profileRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
-    if (!profileRes.ok) throw new Error('Failed to fetch profile');
-    const profile = await profileRes.json();
+    // Get profile with proper error handling
+    let profile = {};
+    try {
+      const profileRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
+      if (profileRes.ok) {
+        profile = await profileRes.json();
+      }
+    } catch (e) {
+      console.error('Profile fetch error:', e.message);
+    }
 
     // Get avatar thumbnail
     let avatarUrl = '';
@@ -69,8 +75,12 @@ export default async function handler(req, res) {
     res.status(200).json({
       user: {
         id: user.id,
-        name: user.name,
-        displayName: profile.displayName || ''
+        name: user.name || username,
+        displayName: profile.displayName || user.name || username
+      },
+      profile: {
+        displayName: profile.displayName || user.name || username,
+        name: profile.name || user.name || username
       },
       avatarUrl,
       assets
