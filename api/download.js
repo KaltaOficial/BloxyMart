@@ -21,6 +21,103 @@ async function fetchArrayBufferSafe(url) {
   return await res.arrayBuffer();
 }
 
+function generateBasicBodyOBJ(type, mtlName = null) {
+  const lines = [];
+  
+  if (mtlName) {
+    lines.push(`mtllib avatar.mtl`);
+  }
+  
+  lines.push(`# BloxyMart - Roblox Avatar OBJ Model`);
+  lines.push(`# Type: ${type}`);
+  lines.push('');
+  
+  if (type === 'r15') {
+    lines.push('# R15 Body Structure');
+    lines.push('o body');
+    lines.push('v -0.5 0 0.5');
+    lines.push('v 0.5 0 0.5');
+    lines.push('v 0.5 1.5 0.5');
+    lines.push('v -0.5 1.5 0.5');
+    lines.push('v -0.5 0 -0.5');
+    lines.push('v 0.5 0 -0.5');
+    lines.push('v 0.5 1.5 -0.5');
+    lines.push('v -0.5 1.5 -0.5');
+    
+    // Head
+    lines.push('o head');
+    lines.push('v -0.35 1.5 0.35');
+    lines.push('v 0.35 1.5 0.35');
+    lines.push('v 0.35 2.1 0.35');
+    lines.push('v -0.35 2.1 0.35');
+    lines.push('v -0.35 1.5 -0.35');
+    lines.push('v 0.35 1.5 -0.35');
+    lines.push('v 0.35 2.1 -0.35');
+    lines.push('v -0.35 2.1 -0.35');
+    
+    // Body faces
+    lines.push('usemtl body_material');
+    lines.push('f 1 2 3 4');
+    lines.push('f 5 8 7 6');
+    lines.push('f 1 5 6 2');
+    lines.push('f 2 6 7 3');
+    lines.push('f 3 7 8 4');
+    lines.push('f 5 1 4 8');
+    
+    // Head faces
+    lines.push('usemtl head_material');
+    lines.push('f 9 10 11 12');
+    lines.push('f 13 16 15 14');
+    lines.push('f 9 13 14 10');
+    lines.push('f 10 14 15 11');
+    lines.push('f 11 15 16 12');
+    lines.push('f 13 9 12 16');
+  } else {
+    // R6 Body Structure
+    lines.push('# R6 Body Structure');
+    lines.push('o body');
+    lines.push('v -0.5 0 0.5');
+    lines.push('v 0.5 0 0.5');
+    lines.push('v 0.5 1.7 0.5');
+    lines.push('v -0.5 1.7 0.5');
+    lines.push('v -0.5 0 -0.5');
+    lines.push('v 0.5 0 -0.5');
+    lines.push('v 0.5 1.7 -0.5');
+    lines.push('v -0.5 1.7 -0.5');
+    
+    // Head
+    lines.push('o head');
+    lines.push('v -0.4 1.7 0.4');
+    lines.push('v 0.4 1.7 0.4');
+    lines.push('v 0.4 2.4 0.4');
+    lines.push('v -0.4 2.4 0.4');
+    lines.push('v -0.4 1.7 -0.4');
+    lines.push('v 0.4 1.7 -0.4');
+    lines.push('v 0.4 2.4 -0.4');
+    lines.push('v -0.4 2.4 -0.4');
+    
+    // Body faces
+    lines.push('usemtl body_material');
+    lines.push('f 1 2 3 4');
+    lines.push('f 5 8 7 6');
+    lines.push('f 1 5 6 2');
+    lines.push('f 2 6 7 3');
+    lines.push('f 3 7 8 4');
+    lines.push('f 5 1 4 8');
+    
+    // Head faces
+    lines.push('usemtl head_material');
+    lines.push('f 9 10 11 12');
+    lines.push('f 13 16 15 14');
+    lines.push('f 9 13 14 10');
+    lines.push('f 10 14 15 11');
+    lines.push('f 11 15 16 12');
+    lines.push('f 13 9 12 16');
+  }
+  
+  return lines.join('\n');
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -38,20 +135,25 @@ export default async function handler(req, res) {
     const avatarData = await avatarRes.json();
 
     const zip = new JSZip();
-    const texturesFolder = zip.folder('textures');
-    const assetsFolder = zip.folder('assets');
+    const texturesFolder = zip.folder('Textures');
+    const assetsFolder = zip.folder('Assets');
 
-    // Start building OBJ and MTL
+    // Start building OBJ
     const objLines = [];
     const mtlLines = [];
+    
+    objLines.push(`mtllib avatar.mtl`);
     objLines.push(`# BloxyMart - Roblox Avatar OBJ Model`);
     objLines.push(`# User ID: ${userId}`);
     objLines.push(`# Type: ${type}`);
     objLines.push('');
 
-    // Add placeholder body vertices (so model opens without being empty)
+    // Generate basic body structure
+    let vertexOffset = 0;
+    
     if (type === 'r15') {
-      objLines.push('o body_r15');
+      objLines.push('# R15 Body');
+      objLines.push('o body');
       objLines.push('v -0.5 0 0.5');
       objLines.push('v 0.5 0 0.5');
       objLines.push('v 0.5 1.5 0.5');
@@ -60,14 +162,44 @@ export default async function handler(req, res) {
       objLines.push('v 0.5 0 -0.5');
       objLines.push('v 0.5 1.5 -0.5');
       objLines.push('v -0.5 1.5 -0.5');
-      objLines.push('f 1 2 3 4');
-      objLines.push('f 5 8 7 6');
-      objLines.push('f 1 5 6 2');
-      objLines.push('f 2 6 7 3');
-      objLines.push('f 3 7 8 4');
-      objLines.push('f 5 1 4 8');
+      
+      objLines.push('vn 0 0 1');
+      objLines.push('vn 0 0 -1');
+      objLines.push('vn 0 1 0');
+      objLines.push('vn 0 -1 0');
+      
+      objLines.push('usemtl body_material');
+      objLines.push('f 1/1/1 2/2/1 3/3/1 4/4/1');
+      objLines.push('f 5/5/2 8/8/2 7/7/2 6/6/2');
+      objLines.push('f 1/1/4 5/5/4 6/6/4 2/2/4');
+      objLines.push('f 2/2/3 6/6/3 7/7/3 3/3/3');
+      objLines.push('f 3/3/1 7/7/1 8/8/1 4/4/1');
+      objLines.push('f 5/5/2 1/1/2 4/4/2 8/8/2');
+      
+      // Head
+      objLines.push('o head');
+      objLines.push('v -0.35 1.5 0.35');
+      objLines.push('v 0.35 1.5 0.35');
+      objLines.push('v 0.35 2.1 0.35');
+      objLines.push('v -0.35 2.1 0.35');
+      objLines.push('v -0.35 1.5 -0.35');
+      objLines.push('v 0.35 1.5 -0.35');
+      objLines.push('v 0.35 2.1 -0.35');
+      objLines.push('v -0.35 2.1 -0.35');
+      
+      objLines.push('usemtl head_material');
+      objLines.push('f 9/1/1 10/2/1 11/3/1 12/4/1');
+      objLines.push('f 13/5/2 16/8/2 15/7/2 14/6/2');
+      objLines.push('f 9/1/4 13/5/4 14/6/4 10/2/4');
+      objLines.push('f 10/2/3 14/6/3 15/7/3 11/3/3');
+      objLines.push('f 11/3/1 15/7/1 16/8/1 12/4/1');
+      objLines.push('f 13/5/2 9/1/2 12/4/2 16/8/2');
+      
+      vertexOffset = 16;
     } else {
-      objLines.push('o body_r6');
+      // R6 Body
+      objLines.push('# R6 Body');
+      objLines.push('o body');
       objLines.push('v -0.5 0 0.5');
       objLines.push('v 0.5 0 0.5');
       objLines.push('v 0.5 1.7 0.5');
@@ -76,15 +208,59 @@ export default async function handler(req, res) {
       objLines.push('v 0.5 0 -0.5');
       objLines.push('v 0.5 1.7 -0.5');
       objLines.push('v -0.5 1.7 -0.5');
-      objLines.push('f 1 2 3 4');
-      objLines.push('f 5 8 7 6');
-      objLines.push('f 1 5 6 2');
-      objLines.push('f 2 6 7 3');
-      objLines.push('f 3 7 8 4');
-      objLines.push('f 5 1 4 8');
+      
+      objLines.push('vn 0 0 1');
+      objLines.push('vn 0 0 -1');
+      objLines.push('vn 0 1 0');
+      objLines.push('vn 0 -1 0');
+      
+      objLines.push('usemtl body_material');
+      objLines.push('f 1/1/1 2/2/1 3/3/1 4/4/1');
+      objLines.push('f 5/5/2 8/8/2 7/7/2 6/6/2');
+      objLines.push('f 1/1/4 5/5/4 6/6/4 2/2/4');
+      objLines.push('f 2/2/3 6/6/3 7/7/3 3/3/3');
+      objLines.push('f 3/3/1 7/7/1 8/8/1 4/4/1');
+      objLines.push('f 5/5/2 1/1/2 4/4/2 8/8/2');
+      
+      // Head
+      objLines.push('o head');
+      objLines.push('v -0.4 1.7 0.4');
+      objLines.push('v 0.4 1.7 0.4');
+      objLines.push('v 0.4 2.4 0.4');
+      objLines.push('v -0.4 2.4 0.4');
+      objLines.push('v -0.4 1.7 -0.4');
+      objLines.push('v 0.4 1.7 -0.4');
+      objLines.push('v 0.4 2.4 -0.4');
+      objLines.push('v -0.4 2.4 -0.4');
+      
+      objLines.push('usemtl head_material');
+      objLines.push('f 9/1/1 10/2/1 11/3/1 12/4/1');
+      objLines.push('f 13/5/2 16/8/2 15/7/2 14/6/2');
+      objLines.push('f 9/1/4 13/5/4 14/6/4 10/2/4');
+      objLines.push('f 10/2/3 14/6/3 15/7/3 11/3/3');
+      objLines.push('f 11/3/1 15/7/1 16/8/1 12/4/1');
+      objLines.push('f 13/5/2 9/1/2 12/4/2 16/8/2');
+      
+      vertexOffset = 16;
     }
 
-    // Fetch avatar thumbnail and include as texture if available
+    // Create basic MTL with body and head materials
+    mtlLines.push(`# BloxyMart Avatar Materials`);
+    mtlLines.push('');
+    mtlLines.push('newmtl body_material');
+    mtlLines.push('Ka 1.000 1.000 1.000');
+    mtlLines.push('Kd 1.000 1.000 1.000');
+    mtlLines.push('Ks 0.100 0.100 0.100');
+    mtlLines.push('Ns 10.0');
+    
+    mtlLines.push('');
+    mtlLines.push('newmtl head_material');
+    mtlLines.push('Ka 1.000 1.000 1.000');
+    mtlLines.push('Kd 1.000 1.000 1.000');
+    mtlLines.push('Ks 0.100 0.100 0.100');
+    mtlLines.push('Ns 10.0');
+
+    // Fetch and include avatar thumbnail as texture
     try {
       const thumbRes = await fetch(
         `https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=420x420&format=Png&isCircular=false`
@@ -93,87 +269,82 @@ export default async function handler(req, res) {
         const arr = await thumbRes.arrayBuffer();
         const buffer = Buffer.from(arr);
         texturesFolder.file(`avatar_thumbnail.png`, buffer);
-        // Add MTL reference for thumbnail as default material
-        mtlLines.push(`newmtl avatar_thumb`);
-        mtlLines.push(`Ka 1.000 1.000 1.000`);
-        mtlLines.push(`Kd 1.000 1.000 1.000`);
-        mtlLines.push(`Ks 0.000 0.000 0.000`);
-        mtlLines.push(`map_Kd textures/avatar_thumbnail.png`);
-        objLines.unshift('mtllib avatar.mtl');
-        objLines.push('usemtl avatar_thumb');
+        
+        // Add MTL reference for avatar thumbnail
+        mtlLines.push('');
+        mtlLines.push('newmtl avatar_thumbnail');
+        mtlLines.push('Ka 1.000 1.000 1.000');
+        mtlLines.push('Kd 1.000 1.000 1.000');
+        mtlLines.push('Ks 0.000 0.000 0.000');
+        mtlLines.push('map_Kd Textures/avatar_thumbnail.png');
       }
     } catch (e) {
       console.error('Thumbnail error:', e.message);
     }
 
-    // Process wearable assets: download raw file + try to download thumbnail via thumbnails.roblox.com
+    // Process wearable assets
     const assets = Array.isArray(avatarData.assets) ? avatarData.assets : [];
     const readmeLines = [];
-    readmeLines.push(`BloxyMart Avatar OBJ`);
+    readmeLines.push(`BloxyMart Avatar OBJ Export`);
     readmeLines.push(`User ID: ${userId}`);
     readmeLines.push(`Type: ${type}`);
     readmeLines.push('');
-    readmeLines.push('Included:');
-    readmeLines.push('- avatar.obj');
-    readmeLines.push('- avatar.mtl (if textures present)');
-    readmeLines.push('- textures/ (downloaded thumbnails and images)');
-    readmeLines.push('- assets/ (raw asset files when available)');
+    readmeLines.push('Files included:');
+    readmeLines.push('- avatar.obj (main 3D model)');
+    readmeLines.push('- avatar.mtl (material definitions)');
+    readmeLines.push('- Textures/ (all texture files)');
+    readmeLines.push('- Assets/ (raw asset files)');
     readmeLines.push('');
-    readmeLines.push('Asset list:');
+    readmeLines.push('Asset Details:');
+    readmeLines.push('');
+
+    let textureCount = 0;
+    let assetCount = 0;
 
     for (const asset of assets) {
       try {
         const skipTypes = ['Animation', 'LocalScript', 'Script', 'ModuleScript', 'Emote', 'ParticleEmitter', 'Sound'];
         if (skipTypes.includes(asset.assetType)) {
-          readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - skipped type: ${asset.assetType}`);
           continue;
         }
 
         // Attempt to download raw asset binary
         const adUrl = `https://assetdelivery.roblox.com/v2/assetId/${asset.id}`;
-        let savedAssetFilename = null;
         try {
           const aRes = await fetch(adUrl);
           if (aRes.ok) {
             const ct = (aRes.headers.get('content-type') || '').toLowerCase();
             const ext = extFromContentType(ct);
-            // If content-type looks like html/json it's probably not a raw file
-            if (ct.includes('text/html') || ct.includes('application/json')) {
-              const txt = await aRes.text().catch(() => '');
-              readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - asset delivery returned ${ct}`);
-            } else {
+            
+            // Check if it's actual binary data, not HTML/JSON error
+            if (!ct.includes('text/html') && !ct.includes('application/json')) {
               const arr = await aRes.arrayBuffer();
               const buffer = Buffer.from(arr);
               const filename = `asset_${asset.id}.${ext}`;
               assetsFolder.file(filename, buffer);
-              savedAssetFilename = `assets/${filename}`;
-              readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) -> ${savedAssetFilename}`);
-              // if image, also add to textures
+              assetCount++;
+              
+              // If it's an image, add to Textures folder
               if (ct.startsWith('image/')) {
-                texturesFolder.file(`${asset.id}.${ext}`, buffer);
-                // add material
-                mtlLines.push(`newmtl mat_${asset.id}`);
-                mtlLines.push(`Ka 1.000 1.000 1.000`);
-                mtlLines.push(`Kd 1.000 1.000 1.000`);
-                mtlLines.push(`Ks 0.000 0.000 0.000`);
-                mtlLines.push(`map_Kd textures/${asset.id}.${ext}`);
-                objLines.push(`o asset_${asset.id}`);
-                objLines.push(`# asset ${asset.id} material mat_${asset.id}`);
-                objLines.push('usemtl mat_' + asset.id);
-                // no geometry because we can't parse binary meshes here
+                const texFilename = `asset_${asset.id}.${ext}`;
+                texturesFolder.file(texFilename, buffer);
+                textureCount++;
+                
+                // Add material to MTL
+                mtlLines.push('');
+                mtlLines.push(`newmtl asset_${asset.id}`);
+                mtlLines.push('Ka 1.000 1.000 1.000');
+                mtlLines.push('Kd 1.000 1.000 1.000');
+                mtlLines.push('Ks 0.000 0.000 0.000');
+                mtlLines.push(`map_Kd Textures/${texFilename}`);
               }
             }
-          } else {
-            const txt = await aRes.text().catch(() => '');
-            readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - asset delivery failed: ${aRes.status}`);
-            console.error(`Asset download failed ${asset.id}:`, aRes.status, txt.slice(0,200));
           }
         } catch (e) {
           console.error(`Asset delivery error ${asset.id}:`, e.message);
-          readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - delivery error: ${e.message}`);
         }
 
-        // Always try thumbnails API to get a preview texture for the asset
+        // Try to get asset thumbnail from Roblox API
         try {
           const thumbApi = `https://thumbnails.roblox.com/v1/assets?assetIds=${asset.id}&size=420x420&format=Png&isCircular=false`;
           const tRes = await fetch(thumbApi);
@@ -186,45 +357,42 @@ export default async function handler(req, res) {
                 const buffer = Buffer.from(arr);
                 const filename = `asset_${asset.id}_thumb.png`;
                 texturesFolder.file(filename, buffer);
-                readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) thumbnail -> textures/${filename}`);
-                // add material referencing this thumbnail
-                mtlLines.push(`newmtl thumb_${asset.id}`);
-                mtlLines.push(`Ka 1.000 1.000 1.000`);
-                mtlLines.push(`Kd 1.000 1.000 1.000`);
-                mtlLines.push(`Ks 0.000 0.000 0.000`);
-                mtlLines.push(`map_Kd textures/${filename}`);
-                objLines.push(`o asset_${asset.id}_thumb`);
-                objLines.push(`# asset ${asset.id} thumbnail material thumb_${asset.id}`);
-                objLines.push('usemtl thumb_' + asset.id);
+                textureCount++;
+                
+                // Add thumbnail material to MTL
+                mtlLines.push('');
+                mtlLines.push(`newmtl asset_${asset.id}_thumb`);
+                mtlLines.push('Ka 1.000 1.000 1.000');
+                mtlLines.push('Kd 1.000 1.000 1.000');
+                mtlLines.push('Ks 0.000 0.000 0.000');
+                mtlLines.push(`map_Kd Textures/${filename}`);
+                
+                readmeLines.push(`${asset.name || 'Unknown'} (ID: ${asset.id})`);
+                readmeLines.push(`  Type: ${asset.assetType}`);
+                readmeLines.push(`  Thumbnail: Textures/asset_${asset.id}_thumb.png`);
+                readmeLines.push('');
               } catch (e) {
                 console.error(`Failed to download thumbnail URL for asset ${asset.id}:`, e.message);
               }
-            } else {
-              readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - no thumbnail URL`);
             }
-          } else {
-            const txt = await tRes.text().catch(() => '');
-            readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - thumbnail API failed: ${tRes.status}`);
           }
         } catch (e) {
           console.error(`Thumbnail API error for asset ${asset.id}:`, e.message);
-          readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - thumbnail error: ${e.message}`);
         }
 
       } catch (e) {
         console.error(`Error processing asset ${asset.id}:`, e.message);
-        readmeLines.push(`${asset.name || 'unknown'} (id:${asset.id}) - error: ${e.message}`);
       }
     }
 
-    // If we have MTL lines, write avatar.mtl and reference it
-    if (mtlLines.length > 0) {
-      zip.file('avatar.mtl', mtlLines.join('\n'));
-      // ensure mtllib is first line
-      if (!objLines[0].startsWith('mtllib')) objLines.unshift('mtllib avatar.mtl');
-    }
+    readmeLines.push('');
+    readmeLines.push(`Summary:`);
+    readmeLines.push(`- Textures extracted: ${textureCount}`);
+    readmeLines.push(`- Assets extracted: ${assetCount}`);
 
+    // Write files to ZIP
     zip.file('avatar.obj', objLines.join('\n'));
+    zip.file('avatar.mtl', mtlLines.join('\n'));
     zip.file('README.txt', readmeLines.join('\n'));
 
     const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
