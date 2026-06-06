@@ -29,41 +29,54 @@ export default async function handler(req, res) {
 
     // Get profile
     const profileRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
+    if (!profileRes.ok) throw new Error('Failed to fetch profile');
     const profile = await profileRes.json();
 
-    // Get avatar
-    const avatarRes = await fetch(
-      `https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=420x420&format=Png&isCircular=false`
-    );
-    const avatarData = await avatarRes.json();
-    const thumb = avatarData.data?.[0]?.imageUrl || '';
+    // Get avatar thumbnail
+    let avatarUrl = '';
+    try {
+      const avatarRes = await fetch(
+        `https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=420x420&format=Png&isCircular=false`
+      );
+      if (avatarRes.ok) {
+        const avatarData = await avatarRes.json();
+        avatarUrl = avatarData.data?.[0]?.imageUrl || '';
+      }
+    } catch (e) {
+      console.error('Avatar thumbnail error:', e.message);
+    }
 
-    // Get avatar assets (clothing, accessories, etc)
+    // Get avatar assets
     let assets = [];
     try {
       const assetsRes = await fetch(`https://avatar.roblox.com/v1/users/${userId}/avatar`);
-      const avatarDetails = await assetsRes.json();
-      
-      if (avatarDetails.assets) {
-        assets = avatarDetails.assets
-          .filter(a => !['Animation', 'LocalScript', 'Script', 'ModuleScript', 'Emote', 'ParticleEmitter'].includes(a.assetType))
-          .map(asset => ({
-            id: asset.id,
-            assetType: asset.assetType,
-            name: asset.name
-          }));
+      if (assetsRes.ok) {
+        const avatarDetails = await assetsRes.json();
+        if (avatarDetails.assets) {
+          assets = avatarDetails.assets
+            .filter(a => !['Animation', 'LocalScript', 'Script', 'ModuleScript', 'Emote', 'ParticleEmitter', 'Sound'].includes(a.assetType))
+            .map(asset => ({
+              id: asset.id,
+              assetType: asset.assetType,
+              name: asset.name
+            }));
+        }
       }
     } catch (e) {
-      // Continue if assets fail
+      console.error('Assets error:', e.message);
     }
 
     res.status(200).json({
-      user,
-      profile,
-      avatarUrl: thumb,
+      user: {
+        id: user.id,
+        name: user.name,
+        displayName: profile.displayName || ''
+      },
+      avatarUrl,
       assets
     });
   } catch (error) {
+    console.error('Search error:', error);
     res.status(500).json({ error: error.message || 'Search failed' });
   }
 }
