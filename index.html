@@ -7,6 +7,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/loaders/OBJLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/loaders/MTLLoader.js"></script>
   <style>
     :root{--bg:#071029;--card:#08202f;--muted:#9fb1d1;--accent:#5eead4}
     body{font-family:Inter,Arial,Helvetica,sans-serif;background:var(--bg);color:#e6eef8;margin:0}
@@ -46,8 +47,8 @@
           <img id="avatarPreview" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 260'><rect width='260' height='260' fill='%23010f1a'/></svg>" />
           <div class="meta" id="meta">Usuario: —<br>Display: —<br>ID: —</div>
           <div class="download-row">
-            <a id="downloadR15" class="btn-primary" href="#">⬇️ R15 OBJ</a>
-            <a id="downloadR6" class="btn-secondary" href="#">⬇️ R6 OBJ</a>
+            <a id="downloadR15" class="btn-primary" href="#">⬇️ R15 ZIP</a>
+            <a id="downloadR6" class="btn-secondary" href="#">⬇️ R6 ZIP</a>
           </div>
         </div>
 
@@ -87,6 +88,9 @@ let scene, camera, renderer, controls;
 function initThreeJS() {
   if (scene) return;
   
+  // Clear previous renderer
+  preview3dEl.innerHTML = '';
+  
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x021a2e);
   
@@ -98,6 +102,7 @@ function initThreeJS() {
   renderer.shadowMap.enabled = true;
   preview3dEl.appendChild(renderer.domElement);
   
+  // Use THREE.OrbitControls from the loaded script
   controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
@@ -112,29 +117,33 @@ function initThreeJS() {
   const ambient = new THREE.AmbientLight(0xffffff, 0.6);
   scene.add(ambient);
   
+  // Handle window resize
+  window.addEventListener('resize', () => {
+    const width = preview3dEl.clientWidth;
+    const height = preview3dEl.clientHeight;
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height);
+  });
+  
   animate();
 }
 
 function animate() {
   requestAnimationFrame(animate);
-  controls.update();
-  renderer.render(scene, camera);
+  if (controls) controls.update();
+  if (renderer) renderer.render(scene, camera);
 }
 
 function createAvatarPreview(type) {
-  // Clear existing meshes
-  while (scene.children.length > 0) {
-    scene.remove(scene.children[0]);
-  }
-  
-  // Re-add lights
-  const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(5, 10, 5);
-  light.castShadow = true;
-  scene.add(light);
-  
-  const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-  scene.add(ambient);
+  // Clear existing meshes but keep lights
+  const meshesToRemove = [];
+  scene.children.forEach(child => {
+    if (!(child instanceof THREE.Light)) {
+      meshesToRemove.push(child);
+    }
+  });
+  meshesToRemove.forEach(mesh => scene.remove(mesh));
   
   const group = new THREE.Group();
   
@@ -281,10 +290,10 @@ async function search() {
     if (!res.ok) throw new Error('User not found');
     
     const data = await res.json();
-    const { user, avatarUrl, assets } = data;
+    const { user, profile, avatarUrl, assets } = data;
     
     currentUserId = user.id;
-    setMeta(user.id, user, avatarUrl, assets);
+    setMeta(user.id, profile, avatarUrl, assets);
     
     initThreeJS();
     createAvatarPreview('r15');
