@@ -4,26 +4,32 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>BloxyMart</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/loaders/OBJLoader.js"></script>
   <style>
     :root{--bg:#071029;--card:#08202f;--muted:#9fb1d1;--accent:#5eead4}
     body{font-family:Inter,Arial,Helvetica,sans-serif;background:var(--bg);color:#e6eef8;margin:0}
-    .wrap{max-width:1100px;margin:24px auto;padding:18px}
+    .wrap{max-width:1200px;margin:24px auto;padding:18px}
     .card{background:var(--card);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,0.03)}
-    .top{display:flex;gap:8px;align-items:center}
-    input{flex:1;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    input{flex:1;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;min-width:200px}
     button,a{padding:10px 12px;border-radius:10px;border:0;cursor:pointer}
     .btn-primary{background:var(--accent);color:#042825;font-weight:700}
     .btn-secondary{background:#60a5fa;color:#05264a;font-weight:700}
     .grid{display:grid;grid-template-columns:300px 1fr;gap:18px;margin-top:16px}
     .left{display:flex;flex-direction:column;gap:12px;align-items:center}
     img{width:260px;height:260px;border-radius:10px;object-fit:cover;border:1px solid rgba(255,255,255,0.03)}
-    .meta{width:100%;background:rgba(255,255,255,0.02);padding:10px;border-radius:8px}
+    .meta{width:100%;background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;font-size:14px}
     .download-row{display:flex;gap:8px;width:100%}
     .download-row a{flex:1;text-align:center;text-decoration:none}
     .panel{background:rgba(255,255,255,0.02);padding:12px;border-radius:10px}
-    .assets{max-height:240px;overflow:auto;padding:6px;border-radius:6px;background:rgba(0,0,0,0.1)}
-    pre{background:#021224;padding:10px;border-radius:8px;color:#cfe3ff;overflow:auto;max-height:360px}
-    @media(max-width:900px){.grid{grid-template-columns:1fr}img{width:180px;height:180px}}
+    .assets{max-height:240px;overflow:auto;padding:6px;border-radius:6px;background:rgba(0,0,0,0.1);font-size:12px}
+    #preview3d{width:100%;height:400px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);background:#021a2e}
+    .status{padding:10px;border-radius:8px;background:rgba(255,255,255,0.05);font-size:12px}
+    .status.error{color:#fb7185}
+    .status.success{color:#4ade80}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}img{width:180px;height:180px}#preview3d{height:250px}}
   </style>
 </head>
 <body>
@@ -37,30 +43,32 @@
 
       <div class="grid">
         <div class="left">
-          <img id="avatarPreview" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 260'><rect width='260' height='260' fill='%23010f1a'/><text x='50%' y='50%' fill='%239fb1d1' font-size='14' text-anchor='middle' dominant-baseline='middle'>Sin preview</text></svg>" alt="preview">
+          <img id="avatarPreview" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 260'><rect width='260' height='260' fill='%23010f1a'/></svg>" />
           <div class="meta" id="meta">Usuario: —<br>Display: —<br>ID: —</div>
           <div class="download-row">
-            <a id="downloadR15" class="btn-primary" href="#">⬇️ Descargar R15 OBJ</a>
-            <a id="downloadR6" class="btn-secondary" href="#">⬇️ Descargar R6 OBJ</a>
+            <a id="downloadR15" class="btn-primary" href="#">⬇️ R15 OBJ</a>
+            <a id="downloadR6" class="btn-secondary" href="#">⬇️ R6 OBJ</a>
           </div>
         </div>
 
         <div>
           <div class="panel">
-            <h3 style="margin:0 0 8px 0">Artículos (Ropa y Accesorios)</h3>
-            <div class="assets" id="wearing">Sin datos</div>
+            <h3 style="margin:0 0 8px 0">Preview 3D</h3>
+            <div id="preview3d"></div>
+            <div class="status" id="previewStatus" style="margin-top:8px;font-size:11px">Cargando...</div>
           </div>
 
           <div style="height:12px"></div>
 
           <div class="panel">
-            <h3 style="margin:0 0 8px 0">Datos completos</h3>
-            <pre id="raw">—</pre>
+            <h3 style="margin:0 0 8px 0">Artículos (Ropa y Accesorios)</h3>
+            <div class="assets" id="wearing">Sin datos</div>
           </div>
         </div>
       </div>
     </div>
   </div>
+
 <script>
 const usernameEl = document.getElementById('username');
 const btnSearch = document.getElementById('btnSearch');
@@ -68,61 +76,271 @@ const btnClear = document.getElementById('btnClear');
 const avatarPreview = document.getElementById('avatarPreview');
 const metaEl = document.getElementById('meta');
 const wearingEl = document.getElementById('wearing');
-const rawEl = document.getElementById('raw');
 const downloadR15 = document.getElementById('downloadR15');
 const downloadR6 = document.getElementById('downloadR6');
+const preview3dEl = document.getElementById('preview3d');
+const previewStatusEl = document.getElementById('previewStatus');
 
 let currentUserId = null;
+let scene, camera, renderer, controls;
 
-function setMeta(user, profile){
-  metaEl.innerHTML = `Usuario: <strong>${profile.name}</strong><br>Display: ${profile.displayName || '—'}<br>ID: ${user.id}`;
+function initThreeJS() {
+  if (scene) return;
+  
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x021a2e);
+  
+  camera = new THREE.PerspectiveCamera(75, preview3dEl.clientWidth / preview3dEl.clientHeight, 0.1, 1000);
+  camera.position.set(0, 1, 2.5);
+  
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(preview3dEl.clientWidth, preview3dEl.clientHeight);
+  renderer.shadowMap.enabled = true;
+  preview3dEl.appendChild(renderer.domElement);
+  
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 4;
+  
+  const light = new THREE.DirectionalLight(0xffffff, 1);
+  light.position.set(5, 10, 5);
+  light.castShadow = true;
+  scene.add(light);
+  
+  const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambient);
+  
+  animate();
 }
 
-function setStatusText(msg){ rawEl.textContent = msg }
-
-async function safeJson(res){
-  const ct = (res.headers.get('content-type')||'').toLowerCase();
-  if(ct.includes('application/json')) return res.json();
-  try{ return await res.json(); }catch(e){ const t = await res.text(); return { error: t } }
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
 }
 
-async function search(){
-  const username = usernameEl.value.trim(); if(!username){ setStatusText('Escribe un username'); return }
-  btnSearch.disabled = true; setStatusText('Buscando...');
-  try{
-    const res = await fetch('/api/search', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ username }) });
-    const data = await safeJson(res);
-    if(!res.ok) throw new Error(data.error || 'Error buscando');
-    const { user, profile, avatarUrl, assets } = data;
+function createAvatarPreview(type) {
+  // Clear existing meshes
+  while (scene.children.length > 0) {
+    scene.remove(scene.children[0]);
+  }
+  
+  // Re-add lights
+  const light = new THREE.DirectionalLight(0xffffff, 1);
+  light.position.set(5, 10, 5);
+  light.castShadow = true;
+  scene.add(light);
+  
+  const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambient);
+  
+  const group = new THREE.Group();
+  
+  if (type === 'r15') {
+    // Torso
+    let torso = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshPhongMaterial({ color: 0xcccccc })
+    );
+    torso.position.set(0, 0.75, 0);
+    torso.castShadow = true;
+    group.add(torso);
+    
+    // Head
+    let head = new THREE.Mesh(
+      new THREE.BoxGeometry(0.8, 0.8, 0.8),
+      new THREE.MeshPhongMaterial({ color: 0xffdbac })
+    );
+    head.position.set(0, 1.9, 0);
+    head.castShadow = true;
+    group.add(head);
+    
+    // Left Arm
+    let leftArm = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 1.1, 0.3),
+      new THREE.MeshPhongMaterial({ color: 0xcccccc })
+    );
+    leftArm.position.set(-0.75, 0.7, 0);
+    leftArm.castShadow = true;
+    group.add(leftArm);
+    
+    // Right Arm
+    let rightArm = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 1.1, 0.3),
+      new THREE.MeshPhongMaterial({ color: 0xcccccc })
+    );
+    rightArm.position.set(0.75, 0.7, 0);
+    rightArm.castShadow = true;
+    group.add(rightArm);
+    
+    // Left Leg
+    let leftLeg = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 1.2, 0.3),
+      new THREE.MeshPhongMaterial({ color: 0x3366cc })
+    );
+    leftLeg.position.set(-0.3, -0.85, 0);
+    leftLeg.castShadow = true;
+    group.add(leftLeg);
+    
+    // Right Leg
+    let rightLeg = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 1.2, 0.3),
+      new THREE.MeshPhongMaterial({ color: 0x3366cc })
+    );
+    rightLeg.position.set(0.3, -0.85, 0);
+    rightLeg.castShadow = true;
+    group.add(rightLeg);
+    
+  } else {
+    // R6
+    let torso = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1.5, 0.5),
+      new THREE.MeshPhongMaterial({ color: 0xcc0000 })
+    );
+    torso.position.set(0, 0.5, 0);
+    torso.castShadow = true;
+    group.add(torso);
+    
+    let head = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshPhongMaterial({ color: 0xffdbac })
+    );
+    head.position.set(0, 2.25, 0);
+    head.castShadow = true;
+    group.add(head);
+    
+    let leftArm = new THREE.Mesh(
+      new THREE.BoxGeometry(0.4, 1.5, 0.4),
+      new THREE.MeshPhongMaterial({ color: 0xffdbac })
+    );
+    leftArm.position.set(-0.9, 0.9, 0);
+    leftArm.castShadow = true;
+    group.add(leftArm);
+    
+    let rightArm = new THREE.Mesh(
+      new THREE.BoxGeometry(0.4, 1.5, 0.4),
+      new THREE.MeshPhongMaterial({ color: 0xffdbac })
+    );
+    rightArm.position.set(0.9, 0.9, 0);
+    rightArm.castShadow = true;
+    group.add(rightArm);
+    
+    let leftLeg = new THREE.Mesh(
+      new THREE.BoxGeometry(0.4, 1.5, 0.4),
+      new THREE.MeshPhongMaterial({ color: 0x0066cc })
+    );
+    leftLeg.position.set(-0.3, -1.1, 0);
+    leftLeg.castShadow = true;
+    group.add(leftLeg);
+    
+    let rightLeg = new THREE.Mesh(
+      new THREE.BoxGeometry(0.4, 1.5, 0.4),
+      new THREE.MeshPhongMaterial({ color: 0x0066cc })
+    );
+    rightLeg.position.set(0.3, -1.1, 0);
+    rightLeg.castShadow = true;
+    group.add(rightLeg);
+  }
+  
+  scene.add(group);
+  previewStatusEl.textContent = `Preview ${type.toUpperCase()} cargado ✓`;
+  previewStatusEl.className = 'status success';
+}
+
+function setMeta(userId, profile, avatarUrl, assets) {
+  metaEl.innerHTML = `Usuario: <strong>${profile.displayName || profile.name}</strong><br>Display: ${profile.name || '—'}<br>ID: ${userId}`;
+  if (avatarUrl) avatarPreview.src = avatarUrl;
+  
+  wearingEl.innerHTML = assets && assets.length ? assets.map(a=>`<div><strong>${a.name||'Unknown'}</strong> <small>(${a.assetType})</small></div>`).join('') : 'Sin datos';
+}
+
+function setPreviewStatus(msg, isError = false) {
+  previewStatusEl.textContent = msg;
+  previewStatusEl.className = isError ? 'status error' : 'status success';
+}
+
+async function search() {
+  const username = usernameEl.value.trim();
+  if (!username) {
+    setPreviewStatus('Escribe un username', true);
+    return;
+  }
+  
+  btnSearch.disabled = true;
+  setPreviewStatus('Buscando usuario...');
+  
+  try {
+    const res = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username })
+    });
+    
+    if (!res.ok) throw new Error('User not found');
+    
+    const data = await res.json();
+    const { user, avatarUrl, assets } = data;
+    
     currentUserId = user.id;
-    if(avatarUrl) avatarPreview.src = avatarUrl;
-    setMeta(user, profile);
-    wearingEl.innerHTML = assets && assets.length ? assets.map(a=>`<div><strong>${a.name||'Unknown'}</strong> <small>(${a.assetType})</small><br><small>ID: ${a.id}</small></div>`).join('') : 'Sin artículos';
-    rawEl.textContent = JSON.stringify(data, null, 2);
-    downloadR15.onclick = ()=> downloadModel(user.id,'r15');
-    downloadR6.onclick = ()=> downloadModel(user.id,'r6');
-  }catch(err){ setStatusText('Error: '+err.message); }
-  finally{ btnSearch.disabled = false }
+    setMeta(user.id, user, avatarUrl, assets);
+    
+    initThreeJS();
+    createAvatarPreview('r15');
+    
+    downloadR15.onclick = () => downloadModel(user.id, 'r15');
+    downloadR6.onclick = () => downloadModel(user.id, 'r6');
+    
+  } catch (err) {
+    setPreviewStatus('Error: ' + err.message, true);
+  } finally {
+    btnSearch.disabled = false;
+  }
 }
 
-async function downloadModel(userId, type){
-  if(!userId){ setStatusText('No user selected'); return }
-  setStatusText('Preparando descarga...');
-  try{
-    const res = await fetch('/api/download', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ userId, type }) });
-    const ct = (res.headers.get('content-type')||'').toLowerCase();
-    if(!res.ok){ const data = await safeJson(res); throw new Error(data.error || 'Descarga fallida'); }
-    if(ct.includes('application/json')){ const data = await res.json(); throw new Error(data.error || 'Respuesta JSON inesperada'); }
+async function downloadModel(userId, type) {
+  if (!userId) return;
+  
+  setPreviewStatus('Preparando descarga...');
+  
+  try {
+    const res = await fetch('/api/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, type })
+    });
+    
+    if (!res.ok) throw new Error('Download failed');
+    
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `avatar_${userId}_${type}.zip`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    setStatusText('Descarga completada.');
-  }catch(err){ setStatusText('Error: '+err.message); }
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `avatar_${userId}_${type}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    
+    setPreviewStatus(`Descargado: avatar_${userId}_${type}.zip ✓`);
+  } catch (err) {
+    setPreviewStatus('Error: ' + err.message, true);
+  }
 }
 
 btnSearch.addEventListener('click', search);
-btnClear.addEventListener('click', ()=>{ usernameEl.value=''; avatarPreview.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 260 260%22><rect width=%22260%22 height=%22260%22 fill=%22%23010f1a%22/><text x=%2250%25%22 y=%2250%25%22 fill=%22%239fb1d1%22 font-size=%2214%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22>Sin preview</text></svg>'; metaEl.innerHTML='Usuario: —<br>Display: —<br>ID: —'; wearingEl.innerHTML='Sin datos'; rawEl.textContent='—'; currentUserId=null })
-
+btnClear.addEventListener('click', () => {
+  usernameEl.value = '';
+  avatarPreview.src = 'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 260 260%22><rect width=%22260%22 height=%22260%22 fill=%22%23010f1a%22/></svg>';
+  metaEl.textContent = 'Usuario: — Display: — ID: —';
+  wearingEl.textContent = 'Sin datos';
+  previewStatusEl.textContent = 'Listo';
+  previewStatusEl.className = 'status';
+});
+usernameEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') search();
+});
 </script>
 </body>
 </html>
